@@ -62,19 +62,19 @@ export default function MaritimePilotReport() {
     }
   }
 
-  const handleRoleChange = (role: AIRole) => {
+  const handleRoleChange = (newRole: AIRole): boolean => {
     if (messages.length > 0) {
       const shouldChange = window.confirm('Changing roles will clear the current chat history. Continue?');
       if (shouldChange) {
-        setAIRole(role);
+        setAIRole(newRole);
         setMessages([]);
         setFormValues({});
         setNewMessage("");
       }
-      // If user clicks cancel, do nothing and keep the current role
-      return;
+      return shouldChange;
     }
-    setAIRole(role);
+    setAIRole(newRole);
+    return true;
   }
 
   const handleInputChange = (id: string, value: string) => {
@@ -176,7 +176,23 @@ export default function MaritimePilotReport() {
           </div>
 
           {/* Role Switcher */}
-          <Tabs value={aiRole} onValueChange={(value) => handleRoleChange(value as AIRole)} className="w-full">
+          <Tabs 
+            value={aiRole} 
+            onValueChange={(value) => {
+              const shouldChange = handleRoleChange(value as AIRole);
+              if (!shouldChange) {
+                // Force the tab back to the current value if the change was cancelled
+                const tabsList = document.querySelector('[role="tablist"]');
+                if (tabsList) {
+                  const currentTab = tabsList.querySelector(`[data-value="${aiRole}"]`);
+                  if (currentTab) {
+                    (currentTab as HTMLElement).click();
+                  }
+                }
+              }
+            }} 
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-3 bg-slate-100">
               <TabsTrigger value="co-worker" className="text-xs">
                 Co-worker
