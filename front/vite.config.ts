@@ -8,6 +8,16 @@ export default defineConfig({
       '@': '/src'
     }
   },
+  build: {
+    target: 'es2015',
+    minify: 'esbuild',
+    rollupOptions: {
+      external: ['@rollup/rollup-win32-x64-msvc', '@rollup/rollup-linux-x64-gnu'],
+      output: {
+        manualChunks: undefined
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': {
