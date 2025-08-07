@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import axios from "axios"
+import { getApiUrl, API_CONFIG } from "@/config/api"
 
 interface Message {
   id: number;
@@ -153,7 +154,7 @@ export default function MaritimePilotReport() {
         setLastCheckedForm(newLastChecked);
         
         try {
-                  const res = await axios.post<ChatResponse>("http://localhost:8000/chat", {
+                  const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), {
           messages: messagesByRole[aiRole].map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
             content: msg.content
@@ -206,7 +207,7 @@ export default function MaritimePilotReport() {
       if (!isInitialized) {
         try {
           console.log("Initializing form...");
-          const res = await axios.post<ChatResponse[]>("http://localhost:8000/initialize", {
+          const res = await axios.post<ChatResponse[]>(getApiUrl(API_CONFIG.ENDPOINTS.INITIALIZE), {
             ai_role: aiRole,
             ai_provider: aiProvider
           });
@@ -348,7 +349,7 @@ export default function MaritimePilotReport() {
     setNewMessage("");
 
     try {
-      const res = await axios.post<ChatResponse>("http://localhost:8000/chat", {
+      const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), {
         messages: messagesByRole[aiRole].concat(userMessage).map(msg => ({
           role: msg.sender === "user" ? "user" : "assistant",
           content: msg.content
