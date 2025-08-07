@@ -44,6 +44,7 @@ export default function MaritimePilotReport() {
   const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null)
   const [modelDropdownRef, setModelDropdownRef] = useState<HTMLDivElement | null>(null)
+  const [showNotification, setShowNotification] = useState(false)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     reportInfo: true,
     vesselDetails: true,
@@ -178,6 +179,11 @@ export default function MaritimePilotReport() {
               ...prev,
               [aiRole]: [...prev[aiRole], aiMessage]
             }));
+            setShowNotification(true);
+            // Auto-hide notification after 5 seconds
+            setTimeout(() => {
+              setShowNotification(false);
+            }, 5000);
           }
         } catch (err) {
           console.error("Error in form check:", err);
@@ -268,6 +274,7 @@ export default function MaritimePilotReport() {
       setRecentlyUpdatedFields(new Set());
       setIsInitialized(false);
       setAIProvider("openai"); // Reset to default provider
+      setShowNotification(false);
     }
   };
 
@@ -364,6 +371,11 @@ export default function MaritimePilotReport() {
         ...prev,
         [aiRole]: [...prev[aiRole], aiMessage]
       }));
+      setShowNotification(true);
+      // Auto-hide notification after 5 seconds
+      setTimeout(() => {
+        setShowNotification(false);
+      }, 5000);
 
       if (res.data.updated_fields) {
         const newValues = {
@@ -810,11 +822,26 @@ export default function MaritimePilotReport() {
             </Collapsible>
 
             <div className="flex gap-3 pt-4">
-              <Button className="flex-1 bg-slate-300 hover:bg-slate-400 text-slate-800">Submit Report</Button>
+              <Button 
+                onClick={handleReset}
+                className="flex-1 bg-slate-300 hover:bg-slate-400 text-slate-800"
+              >
+                Submit Report
+              </Button>
             </div>
           </div>
         </div>
       </div>
+      
+      {/* Notification popup */}
+      {showNotification && (
+        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
+          <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-slate-700">New message from Chap</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
