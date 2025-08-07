@@ -1,36 +1,24 @@
 # Gemini service wrapper
 import os
 import json
-import google.genai as genai
+from google import genai
+from pydantic import BaseModel
+from typing import List
 from dotenv import load_dotenv
 from app.core.prompts import get_prompt_by_role
 
 # Load environment variables and initialize Gemini client
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Define the structured output schema for form field updates
-suggest_fields_schema = {
-    "type": "object",
-    "properties": {
-        "reply": {
-            "type": "string",
-            "description": "Natural, conversational response to the user. Should explain what you're updating and why, ask follow-up questions, and maintain the conversation flow."
-        },
-        "updates": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "field": {"type": "string"},
-                    "suggestion": {"type": "string"}
-                },
-                "required": ["field", "suggestion"]
-            }
-        }
-    },
-    "required": ["reply", "updates"]
-}
+# Define the structured output schema using Pydantic models
+class FieldUpdate(BaseModel):
+    field: str
+    suggestion: str
+
+class FormResponse(BaseModel):
+    reply: str
+    updates: List[FieldUpdate]
 
 async def initialize_form(ai_role: str = "co-worker"):
     """
@@ -44,23 +32,21 @@ async def initialize_form(ai_role: str = "co-worker"):
     """
     system_prompt = get_prompt_by_role(ai_role)
     
-    # Create Gemini model instance
-    model = genai.GenerativeModel('gemini-2.0-flash')
-    
     # Prepare the prompt
-    prompt = f"{system_prompt}\n\nPlease fill in all the fixed fields with the default values shown in the form description."
+    prompt = f"{system_prompt}\n"
     
     # Generate response with structured output
-    response = await model.generate_content_async(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.7,
-            top_p=0.8,
-            top_k=40,
-            max_output_tokens=2048,
-            response_mime_type="application/json",
-            response_schema=suggest_fields_schema
-        )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config={
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+            "response_mime_type": "application/json",
+            "response_schema": FormResponse,
+        },
     )
     
     # Convert Gemini response to OpenAI-like format
@@ -81,9 +67,6 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
     """
     # Get the appropriate system prompt based on role
     system_prompt = get_prompt_by_role(ai_role)
-    
-    # Create Gemini model instance
-    model = genai.GenerativeModel('gemini-2.0-flash')
     
     # Prepare system messages
     system_messages = [system_prompt]
@@ -108,22 +91,20 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
         elif msg.role == "assistant":
             conversation_history.append({"role": "model", "parts": [msg.content]})
     
-    # Create chat session
-    chat = model.start_chat(history=conversation_history)
-    
     # Send the system prompt and user message
     prompt = f"{combined_system_prompt}\n\nUser: {messages[-1].content if messages else 'Please help me with the form.'}"
     
-    response = await chat.send_message_async(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.7,
-            top_p=0.8,
-            top_k=40,
-            max_output_tokens=2048,
-            response_mime_type="application/json",
-            response_schema=suggest_fields_schema
-        )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config={
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+            "response_mime_type": "application/json",
+            "response_schema": FormResponse,
+        },
     )
     
     # Convert Gemini response to OpenAI-like format
@@ -150,21 +131,41 @@ def convert_gemini_response_to_openai_format(gemini_response):
     content = None
     tool_calls = None
     
-    # For structured output, the response.text contains the JSON string
-    if hasattr(gemini_response, 'text') and gemini_response.text:
+    # Use the parsed response if available
+    if hasattr(gemini_response, 'parsed') and gemini_response.parsed:
+        structured_data = gemini_response.parsed
+        # Convert Pydantic model to dict for JSON serialization
+        if hasattr(structured_data, 'model_dump'):
+            structured_dict = structured_data.model_dump()
+        else:
+            structured_dict = structured_data.dict()
+        
+        tool_calls = [
+            MockToolCall(
+                MockFunction(
+                    json.dumps(structured_dict)
+                )
+            )
+        ]
+        # Extract reply from structured data for content
+        if isinstance(structured_dict, dict) and 'reply' in structured_dict:
+            content = structured_dict['reply']
+    elif hasattr(gemini_response, 'text') and gemini_response.text:
+        # Fallback to text response if no structured output
         try:
-            # Try to parse the JSON response
-            structured_data = json.loads(gemini_response.text)
+            # Try to parse as JSON first
+            structured_dict = json.loads(gemini_response.text)
             tool_calls = [
                 MockToolCall(
                     MockFunction(
-                        json.dumps(structured_data)
+                        json.dumps(structured_dict)
                     )
                 )
             ]
-            # Extract reply from structured data for content
-            if isinstance(structured_data, dict) and 'reply' in structured_data:
-                content = structured_data['reply']
+            if isinstance(structured_dict, dict) and 'reply' in structured_dict:
+                content = structured_dict['reply']
+            else:
+                content = gemini_response.text
         except json.JSONDecodeError:
             # If not JSON, use as regular text content
             content = gemini_response.text
