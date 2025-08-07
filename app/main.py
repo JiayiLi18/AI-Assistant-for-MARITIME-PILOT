@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import chat
 
+
 app = FastAPI()
 
 # Configure CORS (Cross-Origin Resource Sharing) middleware

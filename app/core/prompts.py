@@ -56,18 +56,9 @@ FUNCTION_CALL_RULES_SECTION = """
 ================================================================
 FUNCTION CALL RULES
 ================================================================
-• Always group related updates in **one** `suggest_fields` call.  
+• Always group related updates in **one** call.  
 • Only touch fields you are sure about; use exact field IDs.
-• ALWAYS include a natural, conversational reply in the tool call according to current role: co-worker, butler, coach.
-• Example:
-```json
-{
-  "reply": "That sounds like challenging conditions! I'm updating the visibility and sea state based on what you described. Were there any specific hazards you noticed during these rough conditions?",
-  "updates": [
-    { "field": "visibility", "suggestion": "Poor" },
-    { "field": "sea-state", "suggestion": "Rough" }
-  ]
-}"""
+• ALWAYS include a natural, conversational reply according to current role: co-worker, butler, coach."""
 
 
 # Common special field notes

@@ -5,7 +5,8 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from app.models.schemas import ChatRequest, ChatResponse
-from app.services.openai_service import chat_completion, initialize_form
+from app.services.openai_service import chat_completion as openai_chat_completion, initialize_form as openai_initialize_form
+from app.services.gemini_service import chat_completion as gemini_chat_completion, initialize_form as gemini_initialize_form
 import json
 import logging
 
@@ -37,6 +38,7 @@ def format_updates(updated_fields):
 class InitializeRequest(BaseModel):
     """Request model for initialize endpoint"""
     ai_role: str = "co-worker"
+    ai_provider: str = "openai"  # "openai" or "gemini"
 
 @router.post("/initialize", response_model=List[ChatResponse])
 async def initialize(req: InitializeRequest = InitializeRequest()):
@@ -45,12 +47,17 @@ async def initialize(req: InitializeRequest = InitializeRequest()):
     
     Args:
         req: Request containing the AI role to use ("co-worker", "butler", "coach")
+              and AI provider ("openai" or "gemini")
         
     Returns a list of responses:
     1. Welcome message
     2. Initial form state and list of fields that need to be filled
     """
-    init_msg = await initialize_form(req.ai_role)
+    # Choose AI provider
+    if req.ai_provider == "gemini":
+        init_msg = await gemini_initialize_form(req.ai_role)
+    else:
+        init_msg = await openai_initialize_form(req.ai_role)
     if init_msg.tool_calls:
         tool_call = init_msg.tool_calls[0]
         data = json.loads(tool_call.function.arguments)
@@ -117,13 +124,21 @@ async def chat(req: ChatRequest):
     1. Direct updates from the frontend UI
     2. AI-generated updates from chat messages
     """
-    # Process chat message through AI
-    ai_msg = await chat_completion(
-        req.messages, 
-        form=req.form,
-        is_first_message=not req.messages,
-        ai_role=req.ai_role or "co-worker"
-    )
+    # Choose AI provider and process chat message
+    if req.ai_provider == "gemini":
+        ai_msg = await gemini_chat_completion(
+            req.messages, 
+            form=req.form,
+            is_first_message=not req.messages,
+            ai_role=req.ai_role or "co-worker"
+        )
+    else:
+        ai_msg = await openai_chat_completion(
+            req.messages, 
+            form=req.form,
+            is_first_message=not req.messages,
+            ai_role=req.ai_role or "co-worker"
+        )
     
     # Initialize response variables
     conversation_part = ""

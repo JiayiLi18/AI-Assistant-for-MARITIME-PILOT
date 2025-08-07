@@ -23,6 +23,8 @@ class ChatRequest(BaseModel):
     is_ai_update: bool = True
     # AI role for selecting appropriate prompt ("co-worker", "butler", "coach")
     ai_role: Optional[str] = "co-worker"
+    # AI provider to use ("openai" or "gemini")
+    ai_provider: Optional[str] = "openai"
 
 class ChatResponse(BaseModel):
     """Response model for chat endpoints"""

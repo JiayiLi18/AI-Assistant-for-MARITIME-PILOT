@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Send, Bot, Ship, Mic, ChevronDown, ChevronUp } from "lucide-react"
+import { Send, Bot, Ship, ChevronDown, ChevronUp } from "lucide-react"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -27,9 +27,11 @@ interface ChatResponse {
 }
 
 type AIRole = "co-worker" | "butler" | "coach"
+type AIProvider = "openai" | "gemini"
 
 export default function MaritimePilotReport() {
   const [aiRole, setAIRole] = useState<AIRole>("co-worker")
+  const [aiProvider, setAIProvider] = useState<AIProvider>("gemini")
   const [newMessage, setNewMessage] = useState("")
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [messagesByRole, setMessagesByRole] = useState<Record<AIRole, Message[]>>({
@@ -41,6 +43,7 @@ export default function MaritimePilotReport() {
   const [lastCheckedForm, setLastCheckedForm] = useState<Record<string, any>>({})
   const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null)
+  const [modelDropdownRef, setModelDropdownRef] = useState<HTMLDivElement | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     reportInfo: true,
     vesselDetails: true,
@@ -49,11 +52,29 @@ export default function MaritimePilotReport() {
     pilotageRecommendations: false,
     stressFatigue: false,
     submission: false,
+    modelDropdown: false,
   })
 
   const messages = messagesByRole[aiRole]
 
   const getTimestamp = () => new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+
+  // Close model dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef && !modelDropdownRef.contains(event.target as Node)) {
+        setOpenSections(prev => ({ ...prev, modelDropdown: false }));
+      }
+    };
+
+    if (openSections.modelDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openSections.modelDropdown, modelDropdownRef]);
 
   const monitoredFields = [
     // Report Information
@@ -131,18 +152,19 @@ export default function MaritimePilotReport() {
         setLastCheckedForm(newLastChecked);
         
         try {
-          const res = await axios.post<ChatResponse>("http://localhost:8000/chat", {
-            messages: messagesByRole[aiRole].map(msg => ({
-              role: msg.sender === "user" ? "user" : "assistant",
-              content: msg.content
-            })).concat([{
-              role: "user",
-              content: `I've updated the following fields: ${finalChangedFields.join(", ")}`
-            }]),
-            form: formValues,
-            is_ai_update: false,
-            ai_role: aiRole
-          });
+                  const res = await axios.post<ChatResponse>("http://localhost:8000/chat", {
+          messages: messagesByRole[aiRole].map(msg => ({
+            role: msg.sender === "user" ? "user" : "assistant",
+            content: msg.content
+          })).concat([{
+            role: "user",
+            content: `I've updated the following fields: ${finalChangedFields.join(", ")}`
+          }]),
+          form: formValues,
+          is_ai_update: false,
+          ai_role: aiRole,
+          ai_provider: aiProvider
+        });
 
           if (res.data.reply && res.data.reply.trim()) {
             const aiMessage = {
@@ -171,7 +193,7 @@ export default function MaritimePilotReport() {
         clearTimeout(debounceTimer);
       }
     };
-  }, [formValues, isInitialized, aiRole]); // React to formValues changes
+  }, [formValues, isInitialized, aiRole, aiProvider]); // React to formValues changes
 
   useEffect(() => {
     const initializeForm = async () => {
@@ -179,7 +201,8 @@ export default function MaritimePilotReport() {
         try {
           console.log("Initializing form...");
           const res = await axios.post<ChatResponse[]>("http://localhost:8000/initialize", {
-            ai_role: aiRole
+            ai_role: aiRole,
+            ai_provider: aiProvider
           });
 
           // Get the last response for form updates
@@ -224,7 +247,7 @@ export default function MaritimePilotReport() {
     };
 
     initializeForm();
-  }, [isInitialized, aiRole]);
+  }, [isInitialized, aiRole, aiProvider]);
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? This will clear all chat histories and form values.')) {
@@ -244,12 +267,9 @@ export default function MaritimePilotReport() {
       setLastCheckedForm({});
       setRecentlyUpdatedFields(new Set());
       setIsInitialized(false);
+      setAIProvider("openai"); // Reset to default provider
     }
   };
-
-
-
-
 
   const getRoleDisplayName = (role: AIRole) => {
     switch (role) {
@@ -275,6 +295,10 @@ export default function MaritimePilotReport() {
 
   const handleRoleChange = (newRole: AIRole) => {
     setAIRole(newRole);
+  };
+
+  const handleProviderChange = (newProvider: AIProvider) => {
+    setAIProvider(newProvider);
   };
 
   const handleInputChange = (id: string, value: string) => {
@@ -324,7 +348,8 @@ export default function MaritimePilotReport() {
         })),
         form: formValues,
         is_ai_update: true,
-        ai_role: aiRole
+        ai_role: aiRole,
+        ai_provider: aiProvider
       });
 
 
@@ -399,23 +424,25 @@ export default function MaritimePilotReport() {
             </Button>
           </div>
 
-          <Tabs 
-            value={aiRole} 
-            onValueChange={(value) => handleRoleChange(value as AIRole)} 
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
-              <TabsTrigger value="co-worker" className="text-xs">
-                Role 1
-              </TabsTrigger>
-              <TabsTrigger value="butler" className="text-xs">
-                Role 2
-              </TabsTrigger>
-              <TabsTrigger value="coach" className="text-xs">
-                Role 3
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="space-y-3">
+            <Tabs 
+              value={aiRole} 
+              onValueChange={(value) => handleRoleChange(value as AIRole)} 
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+                <TabsTrigger value="co-worker" className="text-xs">
+                  Role 1
+                </TabsTrigger>
+                <TabsTrigger value="butler" className="text-xs">
+                  Role 2
+                </TabsTrigger>
+                <TabsTrigger value="coach" className="text-xs">
+                  Role 3
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -480,9 +507,37 @@ export default function MaritimePilotReport() {
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
             />
-            <Button size="sm" variant="ghost" className="rounded-full p-2">
-              <Mic className="w-4 h-4 text-indigo-800" />
-            </Button>
+            <div className="relative" ref={setModelDropdownRef}>
+              <button
+                onClick={() => setOpenSections(prev => ({ ...prev, modelDropdown: !prev.modelDropdown }))}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 bg-white border border-indigo-200 rounded-md hover:bg-indigo-50 transition-colors"
+              >
+                {aiProvider === "gemini" ? "Gemini" : "OpenAI"}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {openSections.modelDropdown && (
+                <div className="absolute bottom-full right-0 mb-1 bg-white border border-slate-200 rounded-md shadow-lg z-10 min-w-[100px]">
+                  <button
+                    onClick={() => {
+                      handleProviderChange("openai");
+                      setOpenSections(prev => ({ ...prev, modelDropdown: false }));
+                    }}
+                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "openai" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
+                  >
+                    GPT-4o-mini
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleProviderChange("gemini");
+                      setOpenSections(prev => ({ ...prev, modelDropdown: false }));
+                    }}
+                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "gemini" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
+                  >
+                    Gemini 2.0 Flash
+                  </button>
+                </div>
+              )}
+            </div>
             <Button onClick={handleSendMessage} size="sm" className="rounded-full p-2 bg-indigo-600 hover:bg-indigo-900">
               <Send className="w-4 h-4" />
             </Button>

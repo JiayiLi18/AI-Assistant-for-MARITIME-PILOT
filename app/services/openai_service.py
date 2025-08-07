@@ -53,11 +53,11 @@ async def initialize_form(ai_role: str = "co-worker"):
     
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "system", "content": "Please use the suggest_fields function to fill in all the fixed fields with the default values shown in the form description. Even if the fields have default values, you MUST call suggest_fields to populate them."}
+        {"role": "system", "content": "Please fill in all the fixed fields with the default values shown in the form description."}
     ]
     
     resp = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=messages,
         tools=[{
             "type": "function",
@@ -103,7 +103,7 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
     all_messages = system_messages + messages
 
     resp = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=all_messages,
         tools=[{
             "type": "function",
