@@ -2,8 +2,7 @@
 import os
 import json
 from google import genai
-from pydantic import BaseModel
-from typing import List
+from google.genai import types
 from dotenv import load_dotenv
 from app.core.prompts import get_prompt_by_role
 
@@ -11,14 +10,43 @@ from app.core.prompts import get_prompt_by_role
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Define the structured output schema using Pydantic models
-class FieldUpdate(BaseModel):
-    field: str
-    suggestion: str
+# Define the function declaration for form field updates
+suggest_fields_function = {
+    "name": "suggest_fields",
+    "description": "Updates form fields while providing a natural, conversational response to the user.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "reply": {
+                "type": "string",
+                "description": "Natural, conversational response to the user. Should explain what you're updating and why, ask follow-up questions, and maintain the conversation flow."
+            },
+            "updates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "field": {
+                            "type": "string",
+                            "description": "The form field name to update"
+                        },
+                        "suggestion": {
+                            "type": "string", 
+                            "description": "The suggested value for the field"
+                        }
+                    },
+                    "required": ["field", "suggestion"]
+                },
+                "description": "List of form fields to update with their suggested values"
+            }
+        },
+        "required": ["reply", "updates"]
+    }
+}
 
-class FormResponse(BaseModel):
-    reply: str
-    updates: List[FieldUpdate]
+# Configure tools for function calling
+tools = types.Tool(function_declarations=[suggest_fields_function])
+config = types.GenerateContentConfig(tools=[tools])
 
 async def initialize_form(ai_role: str = "co-worker"):
     """
@@ -32,21 +60,14 @@ async def initialize_form(ai_role: str = "co-worker"):
     """
     system_prompt = get_prompt_by_role(ai_role)
     
-    # Prepare the prompt
-    prompt = f"{system_prompt}\n"
+    # Prepare the prompt with instruction to use function calling
+    prompt = f"{system_prompt}\n\nPlease fill in all the fixed fields with the default values shown in the form description. Use the suggest_fields function to provide your response."
     
-    # Generate response with structured output
+    # Generate response with function calling
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt,
-        config={
-            "temperature": 0.7,
-            "top_p": 0.8,
-            "top_k": 40,
-            "max_output_tokens": 2048,
-            "response_mime_type": "application/json",
-            "response_schema": FormResponse,
-        },
+        config=config,
     )
     
     # Convert Gemini response to OpenAI-like format
@@ -80,6 +101,11 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
             "Focus on gathering information for fields that require user input or confirmation. No need to confirm already filled fields."
         )
     
+    # Add instruction to use function calling
+    system_messages.append(
+        "Use the suggest_fields function to provide your response with field updates when relevant information is discussed."
+    )
+    
     # Combine system messages
     combined_system_prompt = "\n\n".join(system_messages)
     
@@ -91,20 +117,15 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
         elif msg.role == "assistant":
             conversation_history.append({"role": "model", "parts": [msg.content]})
     
-    # Send the system prompt and user message
-    prompt = f"{combined_system_prompt}\n\nUser: {messages[-1].content if messages else 'Please help me with the form.'}"
+    # Build the complete prompt
+    user_message = messages[-1].content if messages else 'Please help me with the form.'
+    prompt = f"{combined_system_prompt}\n\nUser: {user_message}"
     
+    # Generate response with function calling
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt,
-        config={
-            "temperature": 0.7,
-            "top_p": 0.8,
-            "top_k": 40,
-            "max_output_tokens": 2048,
-            "response_mime_type": "application/json",
-            "response_schema": FormResponse,
-        },
+        config=config,
     )
     
     # Convert Gemini response to OpenAI-like format
@@ -127,47 +148,27 @@ def convert_gemini_response_to_openai_format(gemini_response):
         def __init__(self, arguments):
             self.arguments = arguments
     
-    # Extract structured output from Gemini response
-    content = None
-    tool_calls = None
-    
-    # Use the parsed response if available
-    if hasattr(gemini_response, 'parsed') and gemini_response.parsed:
-        structured_data = gemini_response.parsed
-        # Convert Pydantic model to dict for JSON serialization
-        if hasattr(structured_data, 'model_dump'):
-            structured_dict = structured_data.model_dump()
-        else:
-            structured_dict = structured_data.dict()
+    # Check for function call in the response
+    if (gemini_response.candidates and 
+        gemini_response.candidates[0].content.parts and 
+        gemini_response.candidates[0].content.parts[0].function_call):
         
+        function_call = gemini_response.candidates[0].content.parts[0].function_call
+        
+        # Create tool calls in OpenAI format
         tool_calls = [
             MockToolCall(
                 MockFunction(
-                    json.dumps(structured_dict)
+                    json.dumps(function_call.args)
                 )
             )
         ]
-        # Extract reply from structured data for content
-        if isinstance(structured_dict, dict) and 'reply' in structured_dict:
-            content = structured_dict['reply']
-    elif hasattr(gemini_response, 'text') and gemini_response.text:
-        # Fallback to text response if no structured output
-        try:
-            # Try to parse as JSON first
-            structured_dict = json.loads(gemini_response.text)
-            tool_calls = [
-                MockToolCall(
-                    MockFunction(
-                        json.dumps(structured_dict)
-                    )
-                )
-            ]
-            if isinstance(structured_dict, dict) and 'reply' in structured_dict:
-                content = structured_dict['reply']
-            else:
-                content = gemini_response.text
-        except json.JSONDecodeError:
-            # If not JSON, use as regular text content
-            content = gemini_response.text
+        
+        # Extract reply from function call arguments
+        content = function_call.args.get('reply', '') if function_call.args else ''
+        
+        return MockMessage(content=content, tool_calls=tool_calls)
     
-    return MockMessage(content=content, tool_calls=tool_calls) 
+    # Fallback to text response if no function call
+    content = gemini_response.text if hasattr(gemini_response, 'text') else ''
+    return MockMessage(content=content, tool_calls=None) 
