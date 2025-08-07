@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "vercel-build": "npm install --platform=linux --arch=x64 && npm run build"
   },
   "keywords": [],
   "author": "",
