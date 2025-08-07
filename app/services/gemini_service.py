@@ -1,7 +1,7 @@
 # Gemini service wrapper
 import os
 import json
-import google.generativeai as genai
+import google.genai as genai
 from dotenv import load_dotenv
 from app.core.prompts import get_prompt_by_role
 

@@ -3,7 +3,6 @@
 # It processes both AI-generated and user-direct form updates
 
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
 from app.models.schemas import ChatRequest, ChatResponse
 from app.services.openai_service import chat_completion as openai_chat_completion, initialize_form as openai_initialize_form
 from app.services.gemini_service import chat_completion as gemini_chat_completion, initialize_form as gemini_initialize_form
