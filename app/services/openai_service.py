@@ -49,11 +49,12 @@ async def initialize_form(ai_role: str = "co-worker"):
     Returns:
         The AI's first message with suggested initial field values
     """
+    print(f"[OPENAI] Initializing form with role: {ai_role}")
     system_prompt = get_prompt_by_role(ai_role)
     
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "system", "content": "Please fill in all the fixed fields with the default values shown in the form description."}
+        {"role": "system", "content": "Please fill in all the fixed fields with the default values shown in the form description. Use the suggest_fields function to provide your response."}
     ]
     
     resp = await client.chat.completions.create(
@@ -65,7 +66,9 @@ async def initialize_form(ai_role: str = "co-worker"):
         }],
         tool_choice="auto"
     )
-    return resp.choices[0].message
+    result = resp.choices[0].message
+    print(f"[OPENAI] Initialize response - Tool calls: {bool(result.tool_calls)}")
+    return result
 
 async def chat_completion(messages, form=None, is_first_message=False, ai_role: str = "co-worker"):
     """
@@ -111,4 +114,6 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
         }],
         tool_choice="auto"
     )
-    return resp.choices[0].message
+    result = resp.choices[0].message
+    print(f"[OPENAI] Chat response - Tool calls: {bool(result.tool_calls)}, Messages: {len(messages)}")
+    return result

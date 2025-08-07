@@ -148,13 +148,35 @@ def convert_gemini_response_to_openai_format(gemini_response):
         def __init__(self, arguments):
             self.arguments = arguments
     
-    # Check for function call in the response
-    if (gemini_response.candidates and 
-        gemini_response.candidates[0].content.parts and 
-        gemini_response.candidates[0].content.parts[0].function_call):
+    # Try to access function call directly from the response
+    function_call = None
+    
+    # Method 1: Check if function_call is a direct attribute of the response
+    if hasattr(gemini_response, 'function_call') and gemini_response.function_call:
+        function_call = gemini_response.function_call
+    
+    # Method 2: Check candidates
+    if not function_call and gemini_response.candidates:
+        # Check if function_call is a direct attribute of the candidate
+        if hasattr(gemini_response.candidates[0], 'function_call') and gemini_response.candidates[0].function_call:
+            function_call = gemini_response.candidates[0].function_call
         
-        function_call = gemini_response.candidates[0].content.parts[0].function_call
-        
+        # Check content
+        elif hasattr(gemini_response.candidates[0], 'content') and gemini_response.candidates[0].content:
+            content = gemini_response.candidates[0].content
+            
+            # Check if function_call is a direct attribute of content
+            if hasattr(content, 'function_call') and content.function_call:
+                function_call = content.function_call
+            
+            # Check parts
+            elif hasattr(content, 'parts') and content.parts:
+                for i, part in enumerate(content.parts):
+                    if hasattr(part, 'function_call') and part.function_call:
+                        function_call = part.function_call
+                        break
+    
+    if function_call:
         # Create tool calls in OpenAI format
         tool_calls = [
             MockToolCall(

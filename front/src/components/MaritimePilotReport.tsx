@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Send, Bot, Ship, ChevronDown, ChevronUp } from "lucide-react"
 import ReactMarkdown from 'react-markdown'
@@ -40,7 +39,7 @@ export default function MaritimePilotReport() {
     "butler": [],
     "coach": []
   })
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [isInitialized] = useState(false)
   const [lastCheckedForm, setLastCheckedForm] = useState<Record<string, any>>({})
   const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null)
@@ -154,7 +153,7 @@ export default function MaritimePilotReport() {
         setLastCheckedForm(newLastChecked);
         
         try {
-                  const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), {
+                  const requestData = {
           messages: messagesByRole[aiRole].map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
             content: msg.content
@@ -166,7 +165,13 @@ export default function MaritimePilotReport() {
           is_ai_update: false,
           ai_role: aiRole,
           ai_provider: aiProvider
-        });
+        };
+
+        console.log("🚀 [FRONTEND] Sending form check to /chat:", requestData);
+
+        const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), requestData);
+
+        console.log("📥 [FRONTEND] Received form check from /chat:", res.data);
 
           if (res.data.reply && res.data.reply.trim()) {
             const aiMessage = {
@@ -204,17 +209,27 @@ export default function MaritimePilotReport() {
 
   useEffect(() => {
     const initializeForm = async () => {
-      if (!isInitialized) {
+      // 检查当前role是否已经初始化过
+      const currentRoleMessages = messagesByRole[aiRole];
+      const currentRoleInitialized = currentRoleMessages.length > 0;
+      
+      if (!currentRoleInitialized) {
         try {
-          console.log("Initializing form...");
-          const res = await axios.post<ChatResponse[]>(getApiUrl(API_CONFIG.ENDPOINTS.INITIALIZE), {
+          console.log(`Initializing form for role: ${aiRole}...`);
+          const requestData = {
             ai_role: aiRole,
             ai_provider: aiProvider
-          });
+          };
+          console.log("🚀 [FRONTEND] Sending to /initialize:", requestData);
+          
+          const res = await axios.post<ChatResponse[]>(getApiUrl(API_CONFIG.ENDPOINTS.INITIALIZE), requestData);
+
+          console.log("📥 [FRONTEND] Received from /initialize:", res.data);
 
           // Get the last response for form updates
           const lastResponse = res.data[res.data.length - 1];
           if (lastResponse.updated_fields) {
+            // 为当前role设置表单值
             setFormValues(lastResponse.updated_fields);
             // Also set these as the baseline for change detection
             setLastCheckedForm(lastResponse.updated_fields);
@@ -236,7 +251,6 @@ export default function MaritimePilotReport() {
             ...prev,
             [aiRole]: initMessages
           }));
-          setIsInitialized(true);
         } catch (err) {
           console.error("Error initializing form:", err);
           const errorMessage = {
@@ -254,7 +268,7 @@ export default function MaritimePilotReport() {
     };
 
     initializeForm();
-  }, [isInitialized, aiRole, aiProvider]);
+  }, [aiRole, aiProvider]); // 移除isInitialized依赖，改为依赖aiRole
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? This will clear all chat histories and form values.')) {
@@ -273,7 +287,6 @@ export default function MaritimePilotReport() {
       setNewMessage("");
       setLastCheckedForm({});
       setRecentlyUpdatedFields(new Set());
-      setIsInitialized(false);
       setAIProvider("openai"); // Reset to default provider
       setShowNotification(false);
     }
@@ -302,7 +315,30 @@ export default function MaritimePilotReport() {
   }
 
   const handleRoleChange = (newRole: AIRole) => {
-    setAIRole(newRole);
+    if (newRole === aiRole) return; // 如果选择的是当前role，不做任何操作
+    
+    const currentRoleHasContent = messagesByRole[aiRole].length > 0 || Object.keys(formValues).length > 0;
+    
+    if (currentRoleHasContent) {
+      const confirmMessage = `Switching to ${newRole} will start a new session and clear all current chat history and form data. Are you sure you want to continue?`;
+      
+      if (window.confirm(confirmMessage)) {
+        // 用户确认，清空当前内容并切换到新role
+        setMessagesByRole({
+          "co-worker": [],
+          "butler": [],
+          "coach": []
+        });
+        setFormValues({});
+        setLastCheckedForm({});
+        setRecentlyUpdatedFields(new Set());
+        setAIRole(newRole);
+      }
+      // 如果用户取消，不做任何操作，保持当前role
+    } else {
+      // 当前没有内容，直接切换
+      setAIRole(newRole);
+    }
   };
 
   const handleProviderChange = (newProvider: AIProvider) => {
@@ -349,7 +385,7 @@ export default function MaritimePilotReport() {
     setNewMessage("");
 
     try {
-      const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), {
+      const requestData = {
         messages: messagesByRole[aiRole].concat(userMessage).map(msg => ({
           role: msg.sender === "user" ? "user" : "assistant",
           content: msg.content
@@ -358,8 +394,13 @@ export default function MaritimePilotReport() {
         is_ai_update: true,
         ai_role: aiRole,
         ai_provider: aiProvider
-      });
+      };
+      
+      console.log("🚀 [FRONTEND] Sending to /chat:", requestData);
+      
+      const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), requestData);
 
+      console.log("📥 [FRONTEND] Received from /chat:", res.data);
 
       const aiMessage = {
         id: messages.length + 2,
@@ -438,23 +479,38 @@ export default function MaritimePilotReport() {
           </div>
 
           <div className="space-y-3">
-            <Tabs 
-              value={aiRole} 
-              onValueChange={(value) => handleRoleChange(value as AIRole)} 
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-3 bg-slate-100">
-                <TabsTrigger value="co-worker" className="text-xs">
-                  Role 1
-                </TabsTrigger>
-                <TabsTrigger value="butler" className="text-xs">
-                  Role 2
-                </TabsTrigger>
-                <TabsTrigger value="coach" className="text-xs">
-                  Role 3
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="grid w-full grid-cols-3 bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => handleRoleChange("co-worker")}
+                className={`px-3 py-2 text-xs rounded-md transition-colors ${
+                  aiRole === "co-worker" 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Role 1
+              </button>
+              <button
+                onClick={() => handleRoleChange("butler")}
+                className={`px-3 py-2 text-xs rounded-md transition-colors ${
+                  aiRole === "butler" 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Role 2
+              </button>
+              <button
+                onClick={() => handleRoleChange("coach")}
+                className={`px-3 py-2 text-xs rounded-md transition-colors ${
+                  aiRole === "coach" 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Role 3
+              </button>
+            </div>
           </div>
         </div>
 
@@ -816,7 +872,7 @@ export default function MaritimePilotReport() {
                     <Label htmlFor="submission-date" className="text-sm font-medium text-slate-700">
                       Date of Submission
                     </Label>
-                    <Input id="submission-date" type="date" className={getFieldClassName("submission-date", "mt-1")} value={formValues["submission-date"] || ""} onChange={(e) => handleInputChange("submission-date", e.target.value)} onClick={() => handleFieldClick("submission-date")} />
+                    <Input id="submission-date" className={getFieldClassName("submission-date", "mt-1")} value={formValues["submission-date"] || ""} onChange={(e) => handleInputChange("submission-date", e.target.value)} onClick={() => handleFieldClick("submission-date")} />
                   </div>
                 </div>
               </CollapsibleContent>

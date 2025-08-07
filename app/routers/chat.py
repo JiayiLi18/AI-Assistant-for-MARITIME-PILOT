@@ -52,10 +52,14 @@ async def initialize(req: InitializeRequest = InitializeRequest()):
     1. Welcome message
     2. Initial form state and list of fields that need to be filled
     """
+    logger.info(f"[INITIALIZE] AI Role: {req.ai_role}, AI Provider: {req.ai_provider}")
+    
     # Choose AI provider
     if req.ai_provider == "gemini":
+        logger.info(f"[INITIALIZE] Using Gemini service for role: {req.ai_role}")
         init_msg = await gemini_initialize_form(req.ai_role)
     else:
+        logger.info(f"[INITIALIZE] Using OpenAI service for role: {req.ai_role}")
         init_msg = await openai_initialize_form(req.ai_role)
     if init_msg.tool_calls:
         tool_call = init_msg.tool_calls[0]
@@ -107,11 +111,13 @@ async def initialize(req: InitializeRequest = InitializeRequest()):
                 "\n\n"
             )
         
+        logger.info(f"[INITIALIZE] Success - Tool calls found, updated {len(updated)} fields")
         return [
             ChatResponse(reply=welcome_msg_1, updated_fields={}),
             ChatResponse(reply=welcome_msg_2, updated_fields=updated)
         ]
     
+    logger.info(f"[INITIALIZE] No tool calls found, returning default message")
     return [ChatResponse(reply="Ready to start filling the form.")]
 
 @router.post("/chat", response_model=ChatResponse)
@@ -123,29 +129,36 @@ async def chat(req: ChatRequest):
     1. Direct updates from the frontend UI
     2. AI-generated updates from chat messages
     """
+    ai_role = req.ai_role or "co-worker"
+    is_first_message = not req.messages
+    
+    logger.info(f"[CHAT] AI Role: {ai_role}, AI Provider: {req.ai_provider}, First Message: {is_first_message}, Messages Count: {len(req.messages)}")
+    
     # Choose AI provider and process chat message
     if req.ai_provider == "gemini":
+        logger.info(f"[CHAT] Using Gemini service for role: {ai_role}")
         ai_msg = await gemini_chat_completion(
             req.messages, 
             form=req.form,
-            is_first_message=not req.messages,
-            ai_role=req.ai_role or "co-worker"
+            is_first_message=is_first_message,
+            ai_role=ai_role
         )
     else:
+        logger.info(f"[CHAT] Using OpenAI service for role: {ai_role}")
         ai_msg = await openai_chat_completion(
             req.messages, 
             form=req.form,
-            is_first_message=not req.messages,
-            ai_role=req.ai_role or "co-worker"
+            is_first_message=is_first_message,
+            ai_role=ai_role
         )
     
     # Initialize response variables
-    conversation_part = ""
     updated = {}
     has_updates = False
     
     # Process any field updates from the chat
     if ai_msg.tool_calls:
+        logger.info(f"[CHAT] Tool calls found - processing field updates")
         tool_call = ai_msg.tool_calls[0]
         data = json.loads(tool_call.function.arguments)
         updated = {}
@@ -155,6 +168,7 @@ async def chat(req: ChatRequest):
             updated[update["field"]] = update["suggestion"]
         
         has_updates = bool(updated)
+        logger.info(f"[CHAT] Updated {len(updated)} fields: {list(updated.keys())}")
         
         # Use the reply from tool call for conversational response
         if "reply" in data and data["reply"].strip():
@@ -174,6 +188,7 @@ async def chat(req: ChatRequest):
             updates_text = format_updates(updated)
             reply = f"I've updated the form based on our conversation.\n\n{updates_text}"
     else:
+        logger.info(f"[CHAT] No tool calls found - using text response only")
         # No tool calls, just use the conversation response
         reply = ai_msg.content if ai_msg.content else ""
     
