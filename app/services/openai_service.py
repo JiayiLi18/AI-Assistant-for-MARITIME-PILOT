@@ -1,19 +1,28 @@
-# wrapper around OpenAI ChatCompletion
+# OpenAI service wrapper
+# This module handles all interactions with the OpenAI API, including chat completions
+# and function calling for form field updates
+
 import os
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-from app.core.prompts import SYSTEM_PROMPT
+from app.core.prompts import get_prompt_by_role
 
+# Load environment variables and initialize OpenAI client
 load_dotenv()
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# function schema
+# Define the function schema for suggesting form field updates
+# This schema is used by the OpenAI API to structure its function calls
 suggest_fields = {
     "name": "suggest_fields",
-    "description": "Proposes values for multiple form fields at once.",
+    "description": "Updates form fields while providing a natural, conversational response to the user.",
     "parameters": {
         "type": "object",
         "properties": {
+            "reply": {
+                "type": "string",
+                "description": "Natural, conversational response to the user. Should explain what you're updating and why, ask follow-up questions, and maintain the conversation flow."
+            },
             "updates": {
                 "type": "array",
                 "items": {
@@ -26,21 +35,76 @@ suggest_fields = {
                 }
             }
         },
-        "required": ["updates"]
+        "required": ["reply", "updates"]
     }
 }
 
-async def chat_completion(messages, form=None):
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+async def initialize_form(ai_role: str = "co-worker"):
+    """
+    Initialize form with fixed fields that don't need user confirmation
+    
+    Args:
+        ai_role: The AI role to use for selecting the appropriate prompt
+        
+    Returns:
+        The AI's first message with suggested initial field values
+    """
+    system_prompt = get_prompt_by_role(ai_role)
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": "Please use the suggest_fields function to fill in all the fixed fields with the default values shown in the form description. Even if the fields have default values, you MUST call suggest_fields to populate them."}
+    ]
+    
+    resp = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        tools=[{
+            "type": "function",
+            "function": suggest_fields
+        }],
+        tool_choice="auto"
+    )
+    return resp.choices[0].message
+
+async def chat_completion(messages, form=None, is_first_message=False, ai_role: str = "co-worker"):
+    """
+    Enhanced chat completion with automatic field initialization
+    
+    Args:
+        messages: List of conversation messages
+        form: Current form state dictionary
+        is_first_message: Whether this is the first message in the conversation
+        ai_role: The AI role to use for selecting the appropriate prompt
+    
+    Returns:
+        OpenAI chat completion response with potential function calls
+    """
+    # Get the appropriate system prompt based on role
+    system_prompt = get_prompt_by_role(ai_role)
+    
+    # Add system prompt and current form state to messages
+    system_messages = [{"role": "system", "content": system_prompt}]
+    
     if form:
-        messages.append({
-            "role": "system",
+        system_messages.append({
+            "role": "system", 
             "content": f"Current form values: {form}"
         })
+    
+    # For first message, add instruction to focus on unfilled fields
+    if is_first_message:
+        system_messages.append({
+            "role": "system",
+            "content": "Focus on gathering information for fields that require user input or confirmation. No need to confirm already filled fields."
+        })
+    
+    # Combine all messages and make the API call
+    all_messages = system_messages + messages
 
     resp = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
+        model="gpt-4o",
+        messages=all_messages,
         tools=[{
             "type": "function",
             "function": suggest_fields
