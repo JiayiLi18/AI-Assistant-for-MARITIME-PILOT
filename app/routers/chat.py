@@ -37,7 +37,7 @@ def format_updates(updated_fields):
 class InitializeRequest(BaseModel):
     """Request model for initialize endpoint"""
     ai_role: str = "co-worker"
-    ai_provider: str = "openai"  # "openai" or "gemini"
+    ai_provider: str = "gemini"  # "openai" or "gemini"
 
 @router.post("/initialize", response_model=List[ChatResponse])
 async def initialize(req: InitializeRequest = InitializeRequest()):
@@ -114,7 +114,7 @@ async def initialize(req: InitializeRequest = InitializeRequest()):
         logger.info(f"[INITIALIZE] Success - Tool calls found, updated {len(updated)} fields")
         return [
             ChatResponse(reply=welcome_msg_1, updated_fields={}),
-            ChatResponse(reply=welcome_msg_2, updated_fields=updated)
+            ChatResponse(reply=welcome_msg_2 + f"\n\n---\n\n*Powered by {req.ai_provider.upper()}*", updated_fields=updated)
         ]
     
     logger.info(f"[INITIALIZE] No tool calls found, returning default message")
@@ -193,7 +193,7 @@ async def chat(req: ChatRequest):
         reply = ai_msg.content if ai_msg.content else ""
     
     return ChatResponse(
-        reply=reply,
+        reply=reply + f"\n\n---\n\n*Powered by {req.ai_provider.upper()}*",
         updated_fields=updated,
         has_updates=has_updates
     )
