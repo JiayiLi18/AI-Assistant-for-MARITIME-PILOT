@@ -51,7 +51,6 @@ async def chat(req: ChatRequest):
     
     # Choose AI provider and process chat message
     if req.ai_provider == "gemini":
-        logger.info(f"[CHAT] Using Gemini service for role: {ai_role}")
         ai_msg = await gemini_chat_completion(
             req.messages, 
             form=req.form,
@@ -59,7 +58,6 @@ async def chat(req: ChatRequest):
             ai_role=ai_role
         )
     else:
-        logger.info(f"[CHAT] Using OpenAI service for role: {ai_role}")
         ai_msg = await openai_chat_completion(
             req.messages, 
             form=req.form,
@@ -108,7 +106,7 @@ async def chat(req: ChatRequest):
         reply = ai_msg.content if ai_msg.content else ""
     
     return ChatResponse(
-        reply=reply + f"\n\n---\n\n*Powered by {req.ai_provider.upper()}*",
+        reply=reply,
         updated_fields=updated,
         has_updates=has_updates
     )

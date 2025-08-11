@@ -96,7 +96,7 @@ export default function MaritimePilotReport() {
     return `Updated fields:\n${lines.join("\n")}`
   }
 
-  const buildWelcomeMessages = (role: AIRole, updated: Record<string, any>, provider: AIProvider): { m1: string; m2: string } => {
+  const buildWelcomeMessages = (role: AIRole, updated: Record<string, any>): { m1: string; m2: string } => {
     const filledFields = new Set(Object.keys(updated))
     const unfilled = ALL_FIELDS.filter(f => !filledFields.has(f))
     const unfilledSectionsText = unfilled.length > 0 ? [`Fields to complete: ${unfilled.join(", ")}`] : []
@@ -301,7 +301,7 @@ export default function MaritimePilotReport() {
 
     console.log(`Initializing form locally for role: ${aiRole}, provider: ${aiProvider}...`)
     const updated = getDefaultUpdatedFields()
-    const { m1, m2 } = buildWelcomeMessages(aiRole, updated, aiProvider)
+    const { m1, m2 } = buildWelcomeMessages(aiRole, updated)
 
     // Set initial form values and baseline
     setFormValues(updated)
