@@ -39,37 +39,6 @@ suggest_fields = {
     }
 }
 
-async def initialize_form(ai_role: str = "co-worker"):
-    """
-    Initialize form with fixed fields that don't need user confirmation
-    
-    Args:
-        ai_role: The AI role to use for selecting the appropriate prompt
-        
-    Returns:
-        The AI's first message with suggested initial field values
-    """
-    print(f"[OPENAI] Initializing form with role: {ai_role}")
-    system_prompt = get_prompt_by_role(ai_role)
-    
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "system", "content": "Please fill in all the fixed fields with the default values shown in the form description. Use the suggest_fields function to provide your response."}
-    ]
-    
-    resp = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        tools=[{
-            "type": "function",
-            "function": suggest_fields
-        }],
-        tool_choice="auto"
-    )
-    result = resp.choices[0].message
-    print(f"[OPENAI] Initialize response - Tool calls: {bool(result.tool_calls)}")
-    return result
-
 async def chat_completion(messages, form=None, is_first_message=False, ai_role: str = "co-worker"):
     """
     Enhanced chat completion with automatic field initialization

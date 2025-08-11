@@ -7,8 +7,8 @@ FORM_FIELDS_SECTION = """
 The form has the following sections and fields (with current values if set):
 1. Report Information:
    - report-number: "MPR-2026-001234"
-   - report-date: "03-15-2026" 
-     Format must be MM-DD-YYYY and dates must stay within 2026-2027 range
+   - report-date: "15-03-2026" 
+     Format must be DD-MM-YYYY and dates must stay within 2026-2027 range
    - observation-time: "02:30 PM"
    - location: "Helsinki Harbor, Finnish Archipelago"
 
@@ -33,14 +33,21 @@ The form has the following sections and fields (with current values if set):
 
 6. Work-Related Stress:
    - workload: Assessment on a 1-5 scale indicating workload intensity
-   - stress-feedback: Feedback about stress factors - encourage open sharing while respecting privacy"""
+   - stress-feedback: Feedback about stress factors - encourage open sharing while respecting privacy
+   
+7. Submission:
+- submitted-by: "Jake Anderson"
+- submission-date: "15-03-2026"
+   """
 
 # Common basic rules
 BASIC_RULES_SECTION = """
 Basic rules:
 • Fill every field you can *confidently* infer; prioritize accuracy and completeness.
+• If the user describes a field in their own words and it doesn't exactly match a form field name, identify the closest match and fill it accordingly.
 • Current form values are supplied at runtime; never hard-code them.  
-• Date fields must stay in the 2026-2027 range (MM-DD-YYYY).
+• Date fields must stay in the 2026-2027 range (DD-MM-YYYY).
+• **IMPORTANT**: Never reveal or refer to your role identity (co-worker, butler, coach) during conversation.
 • **IMPORTANT**: If you and the user agree that a field should not be filled (e.g., no incidents occurred, no specific hazards), simply write "none" - don't add explanatory text or apologies."""
 
 # Common workflow rules (first 3 points)

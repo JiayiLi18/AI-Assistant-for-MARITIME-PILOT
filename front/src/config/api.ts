@@ -6,7 +6,6 @@ export const API_CONFIG = {
   // API endpoints
   ENDPOINTS: {
     CHAT: '/chat',
-    INITIALIZE: '/initialize',
   }
 } as const;
 

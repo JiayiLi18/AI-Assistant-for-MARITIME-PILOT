@@ -48,31 +48,6 @@ suggest_fields_function = {
 tools = types.Tool(function_declarations=[suggest_fields_function])
 config = types.GenerateContentConfig(tools=[tools])
 
-async def initialize_form(ai_role: str = "co-worker"):
-    """
-    Initialize form with fixed fields that don't need user confirmation
-    
-    Args:
-        ai_role: The AI role to use for selecting the appropriate prompt
-        
-    Returns:
-        The AI's first message with suggested initial field values
-    """
-    system_prompt = get_prompt_by_role(ai_role)
-    
-    # Prepare the prompt with instruction to use function calling
-    prompt = f"{system_prompt}\n\nPlease fill in all the fixed fields with the default values shown in the form description. Use the suggest_fields function to provide your response."
-    
-    # Generate response with function calling
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt,
-        config=config,
-    )
-    
-    # Convert Gemini response to OpenAI-like format
-    return convert_gemini_response_to_openai_format(response)
-
 async def chat_completion(messages, form=None, is_first_message=False, ai_role: str = "co-worker"):
     """
     Enhanced chat completion with automatic field initialization

@@ -39,7 +39,7 @@ export default function MaritimePilotReport() {
     "butler": [],
     "coach": []
   })
-  const [isInitialized] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
   const [lastCheckedForm, setLastCheckedForm] = useState<Record<string, any>>({})
   const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null)
@@ -59,6 +59,84 @@ export default function MaritimePilotReport() {
   const messages = messagesByRole[aiRole]
 
   const getTimestamp = () => new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+
+  // Local initialization helpers (replace /initialize API)
+  const ALL_FIELDS = [
+    "report-number", "report-date", "observation-time", "location",
+    "vessel-name", "imo-number", "vessel-type", "pilot-id",
+    "hazards-description", "visibility", "sea-state", "wind-conditions",
+    "incident-details", "pilotage-comments", "improvements",
+    "workload", "stress-feedback", "submitted-by", "submission-date"
+  ] as const
+
+  const getDefaultUpdatedFields = (): Record<string, any> => ({
+    // 1. Report Information
+    "report-number": "MPR-2026-001234",
+    "report-date": "15-03-2026", // DD-MM-YYYY
+    "observation-time": "02:30 PM",
+    "location": "Helsinki Harbor, Finnish Archipelago",
+    // 2. Vessel and Pilot Details
+    "vessel-name": "Beatrice 4",
+    "imo-number": "9876543",
+    "vessel-type": "Cargo Ship",
+    "pilot-id": "Jake Anderson / P-2026",
+    // 3. Safety Observations (environment)
+    "visibility": "Good",
+    "sea-state": "Moderate",
+    "wind-conditions": "12 kts NW",
+    // 7. Submission
+    "submitted-by": "Jake Anderson",
+    "submission-date": "15-03-2026"
+  })
+
+  const formatUpdates = (updated: Record<string, any>): string => {
+    const entries = Object.entries(updated)
+    if (entries.length === 0) return ""
+    const lines = entries.map(([field, value]) => `• **${field}**: ${value}`)
+    return `Updated fields:\n${lines.join("\n")}`
+  }
+
+  const buildWelcomeMessages = (role: AIRole, updated: Record<string, any>, provider: AIProvider): { m1: string; m2: string } => {
+    const filledFields = new Set(Object.keys(updated))
+    const unfilled = ALL_FIELDS.filter(f => !filledFields.has(f))
+    const unfilledSectionsText = unfilled.length > 0 ? [`Fields to complete: ${unfilled.join(", ")}`] : []
+    const updatesBlock = formatUpdates(updated)
+
+    if (role === "butler") {
+      const m1 = "Hey Jake! I've auto-filled your Maritime Pilot Report with all the standard info to save you time.\n\n"
+      const m2 = (
+        "Here's what I've completed:\n\n" +
+        `${updatesBlock}\n\n` +
+        "\n\nI just need quick input on these remaining items:\n" +
+        unfilledSectionsText.map(t => `• ${t}`).join("\n") +
+        "\n\nJust give me the basics and I'll auto-suggest the rest!"
+      )
+      return { m1, m2 }
+    }
+
+    if (role === "coach") {
+      const m1 = "Hello Jake. I'm here to support you as you reflect on this pilotage experience and complete your Maritime Pilot Report.\n\n"
+      const m2 = (
+        "I've gathered some of the basic information we know:\n\n" +
+        `${updatesBlock}\n\n` +
+        "\n\nRather than rushing through the remaining fields, I'd love to create space for you to reflect on this journey. Each experience offers opportunities for growth and deeper understanding of your craft.\n\n" +
+        "When you're ready, we can explore together what stood out to you about this pilotage—what challenged you, what went well, or what insights emerged. There's no hurry; we'll move at whatever pace feels right for you.\n\n" +
+        "What would you like to share about this experience?"
+      )
+      return { m1, m2 }
+    }
+
+    // co-worker (default)
+    const m1 = "Hey Jake. I've finished my task and I'm ready to start filling the Maritime Pilot Report now.\n\n"
+    const m2 = (
+      "I've filled all the information I know here.\n\n" +
+      `${updatesBlock}\n\n` +
+      "\n\n Once you're available, could you check these following fields? \n" +
+      unfilledSectionsText.map(t => `• ${t}`).join("\n") +
+      "\n\n"
+    )
+    return { m1, m2 }
+  }
 
   // Close model dropdown when clicking outside
   useEffect(() => {
@@ -144,6 +222,12 @@ export default function MaritimePilotReport() {
         }
         
         console.log("Confirmed field changes, sending to API:", finalChangedFields);
+        console.log("📡 [FRONTEND] CALL_API_AFTER_FORM_UPDATE", {
+          fields: finalChangedFields,
+          role: aiRole,
+          provider: aiProvider,
+          time: new Date().toISOString()
+        });
         
         // Update last checked values before sending API
         const newLastChecked = { ...lastCheckedForm };
@@ -168,10 +252,12 @@ export default function MaritimePilotReport() {
         };
 
         console.log("🚀 [FRONTEND] Sending form check to /chat:", requestData);
+        console.log("[FRONTEND] Payload (form check):\n" + JSON.stringify(requestData, null, 2));
 
         const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), requestData);
 
         console.log("📥 [FRONTEND] Received form check from /chat:", res.data);
+        console.log("[FRONTEND] Response (form check):\n" + JSON.stringify(res.data, null, 2));
 
           if (res.data.reply && res.data.reply.trim()) {
             const aiMessage = {
@@ -208,67 +294,28 @@ export default function MaritimePilotReport() {
   }, [formValues, isInitialized, aiRole, aiProvider]); // React to formValues changes
 
   useEffect(() => {
-    const initializeForm = async () => {
-      // 检查当前role是否已经初始化过
-      const currentRoleMessages = messagesByRole[aiRole];
-      const currentRoleInitialized = currentRoleMessages.length > 0;
-      
-      if (!currentRoleInitialized) {
-        try {
-          console.log(`Initializing form for role: ${aiRole}...`);
-          const requestData = {
-            ai_role: aiRole,
-            ai_provider: aiProvider
-          };
-          console.log("🚀 [FRONTEND] Sending to /initialize:", requestData);
-          
-          const res = await axios.post<ChatResponse[]>(getApiUrl(API_CONFIG.ENDPOINTS.INITIALIZE), requestData);
+    // Local init per role/provider
+    const currentRoleMessages = messagesByRole[aiRole]
+    const currentRoleInitialized = currentRoleMessages.length > 0
+    if (currentRoleInitialized) return
 
-          console.log("📥 [FRONTEND] Received from /initialize:", res.data);
+    console.log(`Initializing form locally for role: ${aiRole}, provider: ${aiProvider}...`)
+    const updated = getDefaultUpdatedFields()
+    const { m1, m2 } = buildWelcomeMessages(aiRole, updated, aiProvider)
 
-          // Get the last response for form updates
-          const lastResponse = res.data[res.data.length - 1];
-          if (lastResponse.updated_fields) {
-            // 为当前role设置表单值
-            setFormValues(lastResponse.updated_fields);
-            // Also set these as the baseline for change detection
-            setLastCheckedForm(lastResponse.updated_fields);
-            
-            // Highlight fields that were auto-filled during initialization
-            const updatedFieldNames = Object.keys(lastResponse.updated_fields);
-            setRecentlyUpdatedFields(new Set(updatedFieldNames));
-          }
+    // Set initial form values and baseline
+    setFormValues(updated)
+    setLastCheckedForm(updated)
+    setRecentlyUpdatedFields(new Set(Object.keys(updated)))
 
-          // Convert all responses to messages
-          const initMessages = res.data.map((response, index) => ({
-            id: index + 1,
-            sender: "ai" as const,
-            content: response.reply,
-            timestamp: getTimestamp(),
-          }));
-
-          setMessagesByRole(prev => ({
-            ...prev,
-            [aiRole]: initMessages
-          }));
-        } catch (err) {
-          console.error("Error initializing form:", err);
-          const errorMessage = {
-            id: 1,
-            sender: "ai" as const,
-            content: "Sorry, I encountered an error during initialization. Please try refreshing the page.",
-            timestamp: getTimestamp(),
-          };
-          setMessagesByRole(prev => ({
-            ...prev,
-            [aiRole]: [errorMessage]
-          }));
-        }
-      }
-    };
-
-    initializeForm();
-  }, [aiRole, aiProvider]); // 移除isInitialized依赖，改为依赖aiRole
+    // Seed two welcome messages
+    const initMessages: Message[] = [
+      { id: 1, sender: "ai", content: m1, timestamp: getTimestamp() },
+      { id: 2, sender: "ai", content: m2, timestamp: getTimestamp() },
+    ]
+    setMessagesByRole(prev => ({ ...prev, [aiRole]: initMessages }))
+    setIsInitialized(true)
+  }, [aiRole, aiProvider])
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? This will clear all chat histories and form values.')) {
@@ -289,6 +336,7 @@ export default function MaritimePilotReport() {
       setRecentlyUpdatedFields(new Set());
       setAIProvider("openai"); // Reset to default provider
       setShowNotification(false);
+      setIsInitialized(false);
     }
   };
 
@@ -332,11 +380,13 @@ export default function MaritimePilotReport() {
         setFormValues({});
         setLastCheckedForm({});
         setRecentlyUpdatedFields(new Set());
+        setIsInitialized(false);
         setAIRole(newRole);
       }
       // 如果用户取消，不做任何操作，保持当前role
     } else {
       // 当前没有内容，直接切换
+      setIsInitialized(false);
       setAIRole(newRole);
     }
   };
@@ -346,6 +396,7 @@ export default function MaritimePilotReport() {
   };
 
   const handleInputChange = (id: string, value: string) => {
+    console.log("[FRONTEND] Field change:", { field: id, value });
     setFormValues(prev => ({
       ...prev,
       [id]: value
@@ -397,10 +448,12 @@ export default function MaritimePilotReport() {
       };
       
       console.log("🚀 [FRONTEND] Sending to /chat:", requestData);
+      console.log("[FRONTEND] Payload (chat):\n" + JSON.stringify(requestData, null, 2));
       
       const res = await axios.post<ChatResponse>(getApiUrl(API_CONFIG.ENDPOINTS.CHAT), requestData);
 
       console.log("📥 [FRONTEND] Received from /chat:", res.data);
+      console.log("[FRONTEND] Response (chat):\n" + JSON.stringify(res.data, null, 2));
 
       const aiMessage = {
         id: messages.length + 2,
