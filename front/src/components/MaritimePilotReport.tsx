@@ -30,6 +30,35 @@ type AIRole = "co-worker" | "butler" | "coach"
 type AIProvider = "openai" | "gemini"
 
 export default function MaritimePilotReport() {
+  // Human-friendly mapping for field guidance (keep in sync with backend)
+  const FIELD_INFO: Record<string, { section: string; label: string }> = {
+    // 1. Report Information
+    "report-number": { section: "Report Information", label: "Report Number" },
+    "report-date": { section: "Report Information", label: "Date" },
+    "observation-time": { section: "Report Information", label: "Time of Observation" },
+    "location": { section: "Report Information", label: "Location" },
+    // 2. Vessel and Pilot Details
+    "vessel-name": { section: "Vessel and Pilot Details", label: "Vessel Name" },
+    "imo-number": { section: "Vessel and Pilot Details", label: "IMO Number" },
+    "vessel-type": { section: "Vessel and Pilot Details", label: "Type of Vessel" },
+    "pilot-id": { section: "Vessel and Pilot Details", label: "Pilot Name/ID" },
+    // 3. Safety Observations
+    "hazards-description": { section: "Safety Observations", label: "Hazards" },
+    "visibility": { section: "Safety Observations", label: "Visibility" },
+    "sea-state": { section: "Safety Observations", label: "Sea State" },
+    "wind-conditions": { section: "Safety Observations", label: "Wind" },
+    // 4. Incident Reporting
+    "incident-details": { section: "Incident or Near-Miss Reporting", label: "Incident Details" },
+    // 5. Pilotage Recommendations
+    "pilotage-comments": { section: "Pilotage Practices & Recommendations", label: "Pilotage Comments" },
+    "improvements": { section: "Pilotage Practices & Recommendations", label: "Improvements" },
+    // 6. Work-Related Stress
+    "workload": { section: "Work-Related Stress & Fatigue", label: "Workload" },
+    "stress-feedback": { section: "Work-Related Stress & Fatigue", label: "Additional Comments" },
+    // 7. Submission
+    "submitted-by": { section: "Submission Details", label: "Submitted by" },
+    "submission-date": { section: "Submission Details", label: "Date of Submission" },
+  }
   const [aiRole, setAIRole] = useState<AIRole>("co-worker")
   const [aiProvider, setAIProvider] = useState<AIProvider>("gemini")
   const [newMessage, setNewMessage] = useState("")
@@ -60,15 +89,6 @@ export default function MaritimePilotReport() {
 
   const getTimestamp = () => new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
 
-  // Local initialization helpers (replace /initialize API)
-  const ALL_FIELDS = [
-    "report-number", "report-date", "observation-time", "location",
-    "vessel-name", "imo-number", "vessel-type", "pilot-id",
-    "hazards-description", "visibility", "sea-state", "wind-conditions",
-    "incident-details", "pilotage-comments", "improvements",
-    "workload", "stress-feedback", "submitted-by", "submission-date"
-  ] as const
-
   const getDefaultUpdatedFields = (): Record<string, any> => ({
     // 1. Report Information
     "report-number": "MPR-2026-001234",
@@ -92,24 +112,54 @@ export default function MaritimePilotReport() {
   const formatUpdates = (updated: Record<string, any>): string => {
     const entries = Object.entries(updated)
     if (entries.length === 0) return ""
-    const lines = entries.map(([field, value]) => `• **${field}**: ${value}`)
-    return `Updated fields:\n${lines.join("\n")}`
+
+    // Group by section preserving insertion order
+    const sectionToItems = new Map<string, string[]>()
+    const standalone: string[] = []
+
+    for (const [field, value] of entries) {
+      const info = FIELD_INFO[field] || { section: "", label: field }
+      const item = `${info.label}: ${value}`
+      if (info.section) {
+        if (!sectionToItems.has(info.section)) sectionToItems.set(info.section, [])
+        sectionToItems.get(info.section)!.push(item)
+      } else {
+        standalone.push(`• **${item}**`)
+      }
+    }
+
+    const lines: string[] = []
+    for (const [section, items] of sectionToItems.entries()) {
+      lines.push(`**${section}**:\n` + items.join('\n'))
+    }
+    lines.push(...standalone)
+
+    return `I've updated the following fields:\n${lines.join("\n")}`
   }
 
   const buildWelcomeMessages = (role: AIRole, updated: Record<string, any>): { m1: string; m2: string } => {
-    const filledFields = new Set(Object.keys(updated))
-    const unfilled = ALL_FIELDS.filter(f => !filledFields.has(f))
-    const unfilledSectionsText = unfilled.length > 0 ? [`Fields to complete: ${unfilled.join(", ")}`] : []
-    const updatesBlock = formatUpdates(updated)
+    const updatesBlock = `---\n\n${formatUpdates(updated)}\n\n---`
+    const pendingBlock = [
+      'Fields to complete:',
+      '**2. Safety Observations**:',
+      '  - Potential hazards observed\n',
+      '**3. Incident or Near-Miss Reporting**:',
+      '  - Incident or Near-Miss Details\n',
+      '**4. Pilotage Practices & Recommendations**:',
+      '  - Comments on Pilotage Procedures\n',
+      '  - Any Suggested Improvements\n',
+      '**Work-Related Stress & Fatigue**:',
+      '  - Workload Assessment (1-5, 5 = very high)\n',
+      '  - Additional Comments\n',
+    ].join('\n')
 
     if (role === "butler") {
       const m1 = "Hey Jake! I've auto-filled your Maritime Pilot Report with all the standard info to save you time.\n\n"
       const m2 = (
         "Here's what I've completed:\n\n" +
         `${updatesBlock}\n\n` +
-        "\n\nI just need quick input on these remaining items:\n" +
-        unfilledSectionsText.map(t => `• ${t}`).join("\n") +
-        "\n\nJust give me the basics and I'll auto-suggest the rest!"
+        "\n\nCould you check these following fields for me?\n" +
+        `${pendingBlock}\n\n`
       )
       return { m1, m2 }
     }
@@ -131,9 +181,8 @@ export default function MaritimePilotReport() {
     const m2 = (
       "I've filled all the information I know here.\n\n" +
       `${updatesBlock}\n\n` +
-      "\n\n Once you're available, could you check these following fields? \n" +
-      unfilledSectionsText.map(t => `• ${t}`).join("\n") +
-      "\n\n"
+      "Once you're available, could you check these following fields?\n" +
+      `${pendingBlock}\n\n`
     )
     return { m1, m2 }
   }

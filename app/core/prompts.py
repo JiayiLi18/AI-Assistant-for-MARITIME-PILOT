@@ -40,13 +40,54 @@ The form has the following sections and fields (with current values if set):
 - submission-date: "15-03-2026"
    """
 
+# UI-friendly labels and sections for pointing users to the right place in the form
+UI_FIELD_LABELS_SECTION = """
+===============================================================
+UI FIELD LABELS (Use these when guiding the user)
+===============================================================
+Say the section name and the UI label, not the technical field id.
+
+Report Information:
+- report-number → "Report Number"
+- report-date → "Date"
+- observation-time → "Time of Observation"
+- location → "Location"
+
+Vessel and Pilot Details:
+- vessel-name → "Vessel Name"
+- imo-number → "IMO Number"
+- vessel-type → "Type of Vessel"
+- pilot-id → "Pilot Name/ID"
+
+Safety Observations:
+- hazards-description → "Hazards"
+- visibility → "Visibility"
+- sea-state → "Sea State"
+- wind-conditions → "Wind"
+
+Incident or Near-Miss Reporting:
+- incident-details → "Incident Details"
+
+Pilotage Practices & Recommendations:
+- pilotage-comments → "Pilotage Comments"
+- improvements → "Improvements"
+
+Work-Related Stress & Fatigue:
+- workload → "Workload"
+- stress-feedback → "Additional Comments"
+
+Submission Details:
+- submitted-by → "Submitted by"
+- submission-date → "Date of Submission"
+"""
+
 # Common basic rules
 BASIC_RULES_SECTION = """
 Basic rules:
 • Fill every field you can *confidently* infer; prioritize accuracy and completeness.
 • If the user describes a field in their own words and it doesn't exactly match a form field name, identify the closest match and fill it accordingly.
 • Current form values are supplied at runtime; never hard-code them.  
-• Date fields must stay in the 2026-2027 range (DD-MM-YYYY).
+• Date fields stay in the 2026-2027 range (DD-MM-YYYY), unless users specify otherwise.
 • **IMPORTANT**: Never reveal or refer to your role identity (co-worker, butler, coach) during conversation.
 • **IMPORTANT**: If you and the user agree that a field should not be filled (e.g., no incidents occurred, no specific hazards), simply write "none" - don't add explanatory text or apologies."""
 
@@ -65,7 +106,10 @@ FUNCTION CALL RULES
 ================================================================
 • Always group related updates in **one** call.  
 • Only touch fields you are sure about; use exact field IDs.
-• ALWAYS include a natural, conversational reply according to current role: co-worker, butler, coach."""
+• ALWAYS include a natural, conversational reply according to current role: co-worker, butler, coach.
+• When guiding the user, reference fields by UI section and label (e.g., "Safety Observations → Hazards"), but in the function call `updates.field` MUST use the exact field id (e.g., `hazards-description`).
+• In your visible update list, format each line as: `Section → Label: value`.
+"""
 
 
 # Common special field notes
@@ -375,6 +419,8 @@ def _build_prompt(role_intro: str, communication_style: str, workflow_extra: str
 {BASIC_RULES_SECTION}
 
 {FORM_FIELDS_SECTION}
+
+{UI_FIELD_LABELS_SECTION}
 
 {communication_style}
 

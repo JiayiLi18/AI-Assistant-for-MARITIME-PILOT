@@ -23,16 +23,61 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Human-friendly field metadata for better user guidance
+FIELD_INFO = {
+    # 1. Report Information
+    "report-number": ("Report Information", "Report Number"),
+    "report-date": ("Report Information", "Date"),
+    "observation-time": ("Report Information", "Time of Observation"),
+    "location": ("Report Information", "Location"),
+    # 2. Vessel and Pilot Details
+    "vessel-name": ("1. Vessel and Pilot Details", "Vessel Name"),
+    "imo-number": ("1. Vessel and Pilot Details", "IMO Number"),
+    "vessel-type": ("1. Vessel and Pilot Details", "Type of Vessel"),
+    "pilot-id": ("1. Vessel and Pilot Details", "Pilot Name/ID"),
+    # 3. Safety Observations
+    "hazards-description": ("2. Safety Observations", "Potential hazards observed"),
+    "visibility": ("2. Safety Observations", "Visibility"),
+    "sea-state": ("2. Safety Observations", "Sea State"),
+    "wind-conditions": ("2. Safety Observations", "Wind Speed & Direction"),
+    # 4. Incident Reporting
+    "incident-details": ("3. Incident or Near-Miss Reporting", "Incident or Near-Miss Details"),
+    # 5. Pilotage Recommendations
+    "pilotage-comments": ("4. Pilotage Practices & Recommendations", "Comments on Pilotage Procedures"),
+    "improvements": ("4. Pilotage Practices & Recommendations", "Any Suggested Improvements"),
+    # 6. Work-Related Stress
+    "workload": ("Work-Related Stress & Fatigue", "Workload Assessment (1-5, 5 = very high)"),
+    "stress-feedback": ("Work-Related Stress & Fatigue", "Additional Comments"),
+    # 7. Submission
+    "submitted-by": ("Submission Details", "Submitted by"),
+    "submission-date": ("Submission Details", "Date of Submission"),
+}
+
 def format_updates(updated_fields):
-    """Simple format for field updates"""
+    """Format field updates grouped by section with compact listing"""
     if not updated_fields:
         return ""
-    
-    updates_list = []
+
+    # Group updates by section, preserving input order
+    section_to_items = {}
+    standalone_items = []
+
     for field, value in updated_fields.items():
-        updates_list.append(f"• **{field}**: {value}")
-    
-    return "Updated fields:\n" + "\n".join(updates_list)
+        section, label = FIELD_INFO.get(field, ("", field))
+        item_text = f"{label}: {value}"
+        if section:
+            section_to_items.setdefault(section, []).append(item_text)
+        else:
+            standalone_items.append(f"• **{item_text}**")
+
+    lines = []
+    for section, items in section_to_items.items():
+        lines.append(f"• In **{section}** section:\n" + "\n".join(items))
+
+    # Append any standalone items (rare)
+    lines.extend(standalone_items)
+
+    return "I've updated the following fields:\n" + "\n".join(lines)
 
 
 @router.post("/chat", response_model=ChatResponse)
