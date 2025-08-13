@@ -60,7 +60,7 @@ export default function MaritimePilotReport() {
     "submission-date": { section: "Submission Details", label: "Date of Submission" },
   }
   const [aiRole, setAIRole] = useState<AIRole>("co-worker")
-  const [aiProvider, setAIProvider] = useState<AIProvider>("gemini")
+  const [aiProvider, setAIProvider] = useState<AIProvider>("openai")
   const [newMessage, setNewMessage] = useState("")
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [messagesByRole, setMessagesByRole] = useState<Record<AIRole, Message[]>>({
