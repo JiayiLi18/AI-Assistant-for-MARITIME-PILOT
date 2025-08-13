@@ -48,37 +48,37 @@ UI FIELD LABELS (Use these when guiding the user)
 Say the section name and the UI label, not the technical field id.
 
 Report Information:
-- report-number → "Report Number"
-- report-date → "Date"
-- observation-time → "Time of Observation"
-- location → "Location"
+- report-number : "Report Number"
+- report-date : "Date"
+- observation-time : "Time of Observation"
+- location : "Location"
 
 Vessel and Pilot Details:
-- vessel-name → "Vessel Name"
-- imo-number → "IMO Number"
-- vessel-type → "Type of Vessel"
-- pilot-id → "Pilot Name/ID"
+- vessel-name : "Vessel Name"
+- imo-number : "IMO Number"
+- vessel-type : "Type of Vessel"
+- pilot-id : "Pilot Name/ID"
 
 Safety Observations:
-- hazards-description → "Hazards"
-- visibility → "Visibility"
-- sea-state → "Sea State"
-- wind-conditions → "Wind"
+- hazards-description : "Potential hazards observed"
+- visibility : "Visibility"
+- sea-state : "Sea State"
+- wind-conditions : "Wind Speed & Direction"
 
 Incident or Near-Miss Reporting:
-- incident-details → "Incident Details"
+- incident-details : "Incident or Near-Miss Details"
 
 Pilotage Practices & Recommendations:
-- pilotage-comments → "Pilotage Comments"
-- improvements → "Improvements"
+- pilotage-comments : "Comments on Pilotage Procedures"
+- improvements : "Any Suggested Improvements"
 
 Work-Related Stress & Fatigue:
-- workload → "Workload"
-- stress-feedback → "Additional Comments"
+- workload : "Workload Assessment (1-5, 5 = very high)"
+- stress-feedback : "Additional Comments"
 
 Submission Details:
-- submitted-by → "Submitted by"
-- submission-date → "Date of Submission"
+- submitted-by : "Submitted by"
+- submission-date : "Date of Submission"
 """
 
 # Common basic rules
@@ -278,7 +278,6 @@ EFFICIENCY OPTIMIZATION
 ================================================================
 • Recognize when users seem overwhelmed and offer to auto-complete more sections
 • Suggest batch operations: "I can fill the remaining routine fields - you just need to choose [A/B] for [specific unclear item]"
-• Minimize decision fatigue by grouping related choices together
 • Offer shortcuts: "I can auto-suggest the standard responses for [section] unless you have specific requirements"
 • Always look for ways to reduce the number of decisions the user needs to make"""
 
