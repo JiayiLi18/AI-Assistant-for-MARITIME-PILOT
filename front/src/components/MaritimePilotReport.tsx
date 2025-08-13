@@ -84,6 +84,12 @@ export default function MaritimePilotReport() {
     submission: false,
     modelDropdown: false,
   })
+  const [isWaitingByRole, setIsWaitingByRole] = useState<Record<AIRole, boolean>>({
+    "co-worker": false,
+    "butler": false,
+    "coach": false
+  })
+  const isWaiting = isWaitingByRole[aiRole]
 
   const messages = messagesByRole[aiRole]
 
@@ -286,6 +292,7 @@ export default function MaritimePilotReport() {
         setLastCheckedForm(newLastChecked);
         
         try {
+          setIsWaitingByRole(prev => ({ ...prev, [aiRole]: true }));
                   const requestData = {
           messages: messagesByRole[aiRole].map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
@@ -328,6 +335,8 @@ export default function MaritimePilotReport() {
           }
         } catch (err) {
           console.error("Error in form check:", err);
+        } finally {
+          setIsWaitingByRole(prev => ({ ...prev, [aiRole]: false }));
         }
       }, 5000);
       
@@ -386,6 +395,7 @@ export default function MaritimePilotReport() {
       setAIProvider("openai"); // Reset to default provider
       setShowNotification(false);
       setIsInitialized(false);
+      setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
     }
   };
 
@@ -431,12 +441,14 @@ export default function MaritimePilotReport() {
         setRecentlyUpdatedFields(new Set());
         setIsInitialized(false);
         setAIRole(newRole);
+        setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
       }
       // 如果用户取消，不做任何操作，保持当前role
     } else {
       // 当前没有内容，直接切换
       setIsInitialized(false);
       setAIRole(newRole);
+      setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
     }
   };
 
@@ -485,6 +497,7 @@ export default function MaritimePilotReport() {
     setNewMessage("");
 
     try {
+      setIsWaitingByRole(prev => ({ ...prev, [aiRole]: true }));
       const requestData = {
         messages: messagesByRole[aiRole].concat(userMessage).map(msg => ({
           role: msg.sender === "user" ? "user" : "assistant",
@@ -546,6 +559,8 @@ export default function MaritimePilotReport() {
         ...prev,
         [aiRole]: [...prev[aiRole], errorMessage]
       }));
+    } finally {
+      setIsWaitingByRole(prev => ({ ...prev, [aiRole]: false }));
     }
   };
 
@@ -558,7 +573,7 @@ export default function MaritimePilotReport() {
 
   return (
     <div className="h-screen bg-slate-100 flex">
-      <div className="w-1/2 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm">
+      <div className="w-2/5 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm">
         <div className="bg-white border-b border-slate-200 p-4 rounded-t-lg flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -667,6 +682,19 @@ export default function MaritimePilotReport() {
               </div>
             </div>
           ))}
+          {isWaiting && (
+            <div className="space-y-2">
+              <div className="text-xs text-slate-500 flex items-center gap-2">
+                {getTimestamp()} · Chap
+              </div>
+              <div className="p-3 rounded-lg max-w-[80%] text-slate-800">
+                <div className="inline-flex items-center gap-2 text-slate-500 text-sm">
+                  <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span>
+                  <span>Waiting for reply…</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-slate-200 flex-shrink-0">
@@ -695,7 +723,7 @@ export default function MaritimePilotReport() {
                     }}
                     className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "openai" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
                   >
-                    GPT-4o-mini
+                    GPT-4o
                   </button>
                   <button
                     onClick={() => {
@@ -716,7 +744,7 @@ export default function MaritimePilotReport() {
         </div>
       </div>
 
-      <div className="w-1/2 flex flex-col m-2 ml-1">
+      <div className="w-3/5 flex flex-col m-2 ml-1">
         <div className="bg-[#1E258A] text-white p-4 rounded-t-lg flex-shrink-0">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <Ship className="w-5 h-5" />

@@ -75,7 +75,7 @@ async def chat_completion(messages, form=None, is_first_message=False, ai_role: 
     all_messages = system_messages + messages
 
     resp = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=all_messages,
         tools=[{
             "type": "function",
