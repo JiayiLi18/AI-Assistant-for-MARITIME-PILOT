@@ -558,7 +558,7 @@ export default function MaritimePilotReport() {
 
   return (
     <div className="h-screen bg-slate-100 flex">
-      <div className="w-1/3 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm">
+      <div className="w-1/2 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm">
         <div className="bg-white border-b border-slate-200 p-4 rounded-t-lg flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -716,7 +716,7 @@ export default function MaritimePilotReport() {
         </div>
       </div>
 
-      <div className="w-2/3 flex flex-col m-2 ml-1">
+      <div className="w-1/2 flex flex-col m-2 ml-1">
         <div className="bg-[#1E258A] text-white p-4 rounded-t-lg flex-shrink-0">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <Ship className="w-5 h-5" />
