@@ -64,7 +64,7 @@ def format_updates(updated_fields):
 
     for field, value in updated_fields.items():
         section, label = FIELD_INFO.get(field, ("", field))
-        item_text = f"{label}: {value}"
+        item_text = f"**{label}**: {value}"
         if section:
             section_to_items.setdefault(section, []).append(item_text)
         else:
@@ -72,7 +72,7 @@ def format_updates(updated_fields):
 
     lines = []
     for section, items in section_to_items.items():
-        lines.append(f"• In **{section}** section:\n" + "\n".join(items))
+        lines.append(f"• **{section}**:\n" + "\n".join(items))
 
     # Append any standalone items (rare)
     lines.extend(standalone_items)
