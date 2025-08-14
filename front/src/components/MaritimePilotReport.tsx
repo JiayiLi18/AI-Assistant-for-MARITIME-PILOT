@@ -89,6 +89,7 @@ export default function MaritimePilotReport() {
     "butler": false,
     "coach": false
   })
+  const [hasStarted, setHasStarted] = useState(false)
   const isWaiting = isWaitingByRole[aiRole]
 
   const messages = messagesByRole[aiRole]
@@ -352,6 +353,7 @@ export default function MaritimePilotReport() {
   }, [formValues, isInitialized, aiRole, aiProvider]); // React to formValues changes
 
   useEffect(() => {
+    if (!hasStarted) return;
     // Local init per role/provider
     const currentRoleMessages = messagesByRole[aiRole]
     const currentRoleInitialized = currentRoleMessages.length > 0
@@ -373,7 +375,7 @@ export default function MaritimePilotReport() {
     ]
     setMessagesByRole(prev => ({ ...prev, [aiRole]: initMessages }))
     setIsInitialized(true)
-  }, [aiRole, aiProvider])
+  }, [aiRole, aiProvider, hasStarted])
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? This will clear all chat histories and form values.')) {
@@ -396,6 +398,7 @@ export default function MaritimePilotReport() {
       setShowNotification(false);
       setIsInitialized(false);
       setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
+      setHasStarted(false);
     }
   };
 
@@ -442,6 +445,7 @@ export default function MaritimePilotReport() {
         setIsInitialized(false);
         setAIRole(newRole);
         setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
+        setHasStarted(false);
       }
       // 如果用户取消，不做任何操作，保持当前role
     } else {
@@ -449,6 +453,7 @@ export default function MaritimePilotReport() {
       setIsInitialized(false);
       setAIRole(newRole);
       setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
+      setHasStarted(false);
     }
   };
 
@@ -481,6 +486,7 @@ export default function MaritimePilotReport() {
   }
 
   const handleSendMessage = async () => {
+    if (!hasStarted) return;
     if (!newMessage.trim()) return;
 
     const userMessage = {
@@ -585,14 +591,26 @@ export default function MaritimePilotReport() {
                 <p className="text-slate-500 text-sm">{getRoleDescription(aiRole)}</p>
               </div>
             </div>
-            <Button 
-              onClick={handleReset}
-              variant="outline" 
-              size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              Reset Chat
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => {
+                  if (!hasStarted) setHasStarted(true)
+                }}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={hasStarted}
+              >
+                Start
+              </Button>
+              <Button 
+                onClick={handleReset}
+                variant="outline" 
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Reset Chat
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -702,9 +720,10 @@ export default function MaritimePilotReport() {
             <Input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder=""
+              placeholder={hasStarted ? "" : "Click Start to begin"}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              disabled={!hasStarted}
             />
             <div className="relative" ref={setModelDropdownRef}>
               <button
@@ -737,7 +756,7 @@ export default function MaritimePilotReport() {
                 </div>
               )}
             </div>
-            <Button onClick={handleSendMessage} size="sm" className="rounded-full p-2 bg-indigo-600 hover:bg-indigo-900">
+            <Button onClick={handleSendMessage} size="sm" className="rounded-full p-2 bg-indigo-600 hover:bg-indigo-900" disabled={!hasStarted}>
               <Send className="w-4 h-4" />
             </Button>
           </div>
