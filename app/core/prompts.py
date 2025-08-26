@@ -20,7 +20,7 @@ The form has the following sections and fields (with current values if set):
 
 3. Safety Observations:
    - hazards-description: "Heavy vessel traffic near Granlandet Island. Captain showed signs of distraction when passing other vessels." (This is the default situation, the pilot knows more about the actual hazards description)
-   - visibility: "Good"
+   - visibility: "Foggy"
    - sea-state: "Moderate"
    - wind-conditions: "12 kts NW"
 
