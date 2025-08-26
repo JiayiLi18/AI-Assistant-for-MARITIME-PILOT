@@ -21,6 +21,8 @@ export interface VoiceCallbacks {
   onPlayingStateChange?: (isPlaying: boolean) => void;
 }
 
+import { API_CONFIG } from '../config/api';
+
 export class VoiceService {
   private ws: WebSocket | null = null;
   private isConnected = false;
@@ -419,10 +421,35 @@ export class VoiceService {
 
 
   private getWebSocketUrl(): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = 'localhost'; // 确保连接到正确的主机
-    const port = '8000'; // 后端固定端口
-    return `${protocol}//${host}:${port}/voice/${this.clientId}`;
+    // 1) 优先使用 VITE_WS_URL（可为 ws(s) 或 http(s)）
+    const envWsUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
+    if (envWsUrl) {
+      try {
+        const u = new URL(envWsUrl);
+        const wsProtocol = u.protocol === 'https:' ? 'wss:' : (u.protocol === 'http:' ? 'ws:' : u.protocol);
+        const base = `${wsProtocol}//${u.host}${u.pathname.replace(/\/$/, '')}`;
+        return `${base}/voice/${this.clientId}`;
+      } catch {
+        // 如果不是完整URL，当作 host 用
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${wsProtocol}//${envWsUrl.replace(/\/$/, '')}/voice/${this.clientId}`;
+      }
+    }
+
+    // 2) 基于 API_CONFIG.BASE_URL 推导
+    if (API_CONFIG?.BASE_URL) {
+      try {
+        const api = new URL(API_CONFIG.BASE_URL);
+        const wsProtocol = api.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${wsProtocol}//${api.host}/voice/${this.clientId}`;
+      } catch {
+        // BASE_URL 不是绝对URL，则回退到 window.location
+      }
+    }
+
+    // 3) 回退到当前站点
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${window.location.host}/voice/${this.clientId}`;
   }
 
   private scheduleReconnect() {
