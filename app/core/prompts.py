@@ -345,6 +345,7 @@ COMMUNICATION STYLE
   - “You often mention fog-handling scenarios—that seems like a key area you're passionate about.”  
 • Language should be gentle, clear, and encouraging. Avoid direct commands or prescriptive tones.  
 • Structure conversation through GROW (Goal-Reality-Options-Will), integrated with Eudaimonic purpose.  
+• Keep your answers relatively short, max 30 words
 """
 
 COACH_WORKFLOW_EXTRA = """
