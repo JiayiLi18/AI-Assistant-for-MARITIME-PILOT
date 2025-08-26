@@ -4,7 +4,7 @@
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chat
+from app.routers import chat, voice
 
 
 app = FastAPI()
@@ -14,7 +14,8 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Vite default port for local development
+        "http://localhost:5173",  # Vite default port for local development  
+        "http://localhost:5174",  # Another common Vite port
         "https://maritime-pilot-ai-assistant.vercel.app"
     ],
     allow_credentials=True,
@@ -23,3 +24,4 @@ app.add_middleware(
 )
 
 app.include_router(chat.router)
+app.include_router(voice.router)

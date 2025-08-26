@@ -29,7 +29,7 @@ suggest_fields = {
                     "type": "object",
                     "properties": {
                         "field": {"type": "string"},
-                        "suggestion": {"type": "string"}
+                        "suggestion": {"oneOf": [{"type": "string"}, {"type": "number"}]}
                     },
                     "required": ["field", "suggestion"]
                 }

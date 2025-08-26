@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Send, Bot, Ship, ChevronDown, ChevronUp } from "lucide-react"
+import VoiceControls from "./VoiceControls"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -44,17 +45,13 @@ export default function MaritimePilotReport() {
     "pilot-id": { section: "Vessel and Pilot Details", label: "Pilot Name/ID" },
     // 3. Safety Observations
     "hazards-description": { section: "Safety Observations", label: "Hazards" },
-    "visibility": { section: "Safety Observations", label: "Visibility" },
-    "sea-state": { section: "Safety Observations", label: "Sea State" },
-    "wind-conditions": { section: "Safety Observations", label: "Wind" },
-    // 4. Incident Reporting
-    "incident-details": { section: "Incident or Near-Miss Reporting", label: "Incident Details" },
+
     // 5. Pilotage Recommendations
     "pilotage-comments": { section: "Pilotage Practices & Recommendations", label: "Pilotage Comments" },
     "improvements": { section: "Pilotage Practices & Recommendations", label: "Improvements" },
     // 6. Work-Related Stress
     "workload": { section: "Work-Related Stress & Fatigue", label: "Workload" },
-    "stress-feedback": { section: "Work-Related Stress & Fatigue", label: "Additional Comments" },
+    "additional-comment": { section: "Work-Related Stress & Fatigue", label: "Additional Comments" },
     // 7. Submission
     "submitted-by": { section: "Submission Details", label: "Submitted by" },
     "submission-date": { section: "Submission Details", label: "Date of Submission" },
@@ -90,11 +87,41 @@ export default function MaritimePilotReport() {
     "coach": false
   })
   const [hasStarted, setHasStarted] = useState(false)
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false)
+  
+  // 添加聊天区域的ref用于自动滚动
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  
   const isWaiting = isWaitingByRole[aiRole]
 
   const messages = messagesByRole[aiRole]
 
   const getTimestamp = () => new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+
+  // 自动滚动到聊天区域底部
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
+    }
+  }
+
+  // 当消息更新时自动滚动到底部
+  useEffect(() => {
+    if (messages.length > 0) {
+      // 使用 setTimeout 确保DOM更新完成后再滚动
+      setTimeout(scrollToBottom, 100)
+    }
+  }, [messages.length])
+
+  // 当等待状态结束时也滚动到底部（AI回复完成）
+  useEffect(() => {
+    if (!isWaiting && messages.length > 0) {
+      setTimeout(scrollToBottom, 100)
+    }
+  }, [isWaiting, messages.length])
 
   const getDefaultUpdatedFields = (): Record<string, any> => ({
     // 1. Report Information
@@ -107,10 +134,6 @@ export default function MaritimePilotReport() {
     "imo-number": "9876543",
     "vessel-type": "Cargo Ship",
     "pilot-id": "Jake Anderson / P-2026",
-    // 3. Safety Observations (environment)
-    "visibility": "Good",
-    "sea-state": "Moderate",
-    "wind-conditions": "12 kts NW",
     // 7. Submission
     "submitted-by": "Jake Anderson",
     "submission-date": "15-03-2026"
@@ -150,8 +173,6 @@ export default function MaritimePilotReport() {
       'Fields to complete:',
       '**2. Safety Observations**:',
       '  - Potential hazards observed\n',
-      '**3. Incident or Near-Miss Reporting**:',
-      '  - Incident or Near-Miss Details\n',
       '**4. Pilotage Practices & Recommendations**:',
       '  - Comments on Pilotage Procedures\n',
       '  - Any Suggested Improvements\n',
@@ -224,14 +245,10 @@ export default function MaritimePilotReport() {
     "pilot-id",
     // Safety Observations
     "hazards-description",
-    "visibility",
-    "sea-state",
-    "wind-conditions",
-    // Incident Reporting
-    "incident-details",
     // Pilotage Recommendations
     "pilotage-comments",
-    "improvements"
+    "improvements",
+    "additional-comment"
   ]
 
 
@@ -333,6 +350,9 @@ export default function MaritimePilotReport() {
             setTimeout(() => {
               setShowNotification(false);
             }, 5000);
+            
+            // 滚动到底部显示AI回复
+            setTimeout(scrollToBottom, 100)
           }
         } catch (err) {
           console.error("Error in form check:", err);
@@ -377,6 +397,69 @@ export default function MaritimePilotReport() {
     setIsInitialized(true)
   }, [aiRole, aiProvider, hasStarted])
 
+  // Handle voice-related functions
+  const handleVoiceFormUpdate = (updates: Record<string, any>) => {
+    console.log("[VOICE] Form updates received:", updates);
+    
+    // Update form values
+    const newValues = {
+      ...formValues,
+      ...updates
+    };
+    setFormValues(newValues);
+    setLastCheckedForm(newValues);
+    
+    // Highlight updated fields
+    const updatedFieldNames = Object.keys(updates);
+    setRecentlyUpdatedFields(new Set(updatedFieldNames));
+    
+    // Show notification
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 5000);
+  };
+
+  const handleVoiceTranscript = (text: string) => {
+    console.log("[VOICE] Transcript received:", text)
+    
+    // Add transcript as user message to chat
+    const userMessage = {
+      id: messages.length + 1,
+      sender: "user" as const,
+      content: `🎤 ${text}`,
+      timestamp: getTimestamp(),
+    };
+
+    setMessagesByRole(prev => ({
+      ...prev,
+      [aiRole]: [...prev[aiRole], userMessage]
+    }));
+    
+    // 滚动到底部显示新消息
+    setTimeout(scrollToBottom, 100)
+  };
+
+  const handleVoiceReply = (reply: string) => {
+    console.log("[VOICE] Voice reply received:", reply)
+    
+    // Add AI voice response to chat
+    const aiMessage = {
+      id: messages.length + 1,
+      sender: "ai" as const,
+      content: `🔊 ${reply}`,
+      timestamp: getTimestamp(),
+    };
+
+    setMessagesByRole(prev => ({
+      ...prev,
+      [aiRole]: [...prev[aiRole], aiMessage]
+    }));
+    
+    // 滚动到底部显示新消息
+    setTimeout(scrollToBottom, 100)
+  };
+
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? This will clear all chat histories and form values.')) {
       // Clear debounce timer
@@ -399,6 +482,7 @@ export default function MaritimePilotReport() {
       setIsInitialized(false);
       setIsWaitingByRole({ "co-worker": false, "butler": false, "coach": false });
       setHasStarted(false);
+      setIsVoiceEnabled(false);
     }
   };
 
@@ -502,6 +586,9 @@ export default function MaritimePilotReport() {
     }));
     setNewMessage("");
 
+    // 滚动到底部显示用户消息
+    setTimeout(scrollToBottom, 100)
+
     try {
       setIsWaitingByRole(prev => ({ ...prev, [aiRole]: true }));
       const requestData = {
@@ -539,6 +626,9 @@ export default function MaritimePilotReport() {
       setTimeout(() => {
         setShowNotification(false);
       }, 5000);
+
+      // 滚动到底部显示AI回复
+      setTimeout(scrollToBottom, 100)
 
       if (res.data.updated_fields) {
         const newValues = {
@@ -579,7 +669,7 @@ export default function MaritimePilotReport() {
 
   return (
     <div className="h-screen bg-slate-100 flex">
-      <div className="w-2/5 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm">
+      <div className="w-1/2 bg-white border-r border-slate-300 flex flex-col m-2 mr-1 rounded-lg shadow-sm relative">
         <div className="bg-white border-b border-slate-200 p-4 rounded-t-lg flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -589,6 +679,38 @@ export default function MaritimePilotReport() {
               <div>
                 <h2 className="font-semibold text-slate-800">Chap {getRoleDisplayName(aiRole)}</h2>
                 <p className="text-slate-500 text-sm">{getRoleDescription(aiRole)}</p>
+              </div>
+              {/* AI Provider Selector */}
+              <div className="relative ml-auto" ref={setModelDropdownRef}>
+                <button
+                  onClick={() => setOpenSections(prev => ({ ...prev, modelDropdown: !prev.modelDropdown }))}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 bg-white border border-indigo-200 rounded-md hover:bg-indigo-50 transition-colors"
+                >
+                  {aiProvider === "gemini" ? "Gemini" : "OpenAI"}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {openSections.modelDropdown && (
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-10 min-w-[100px]">
+                    <button
+                      onClick={() => {
+                        handleProviderChange("openai");
+                        setOpenSections(prev => ({ ...prev, modelDropdown: false }));
+                      }}
+                      className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "openai" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
+                    >
+                      GPT-4o
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleProviderChange("gemini");
+                        setOpenSections(prev => ({ ...prev, modelDropdown: false }));
+                      }}
+                      className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "gemini" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
+                    >
+                      Gemini 2.0 Flash
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -608,7 +730,7 @@ export default function MaritimePilotReport() {
                 size="sm"
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                Reset Chat
+                Reset
               </Button>
             </div>
           </div>
@@ -649,7 +771,7 @@ export default function MaritimePilotReport() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
           {messages.map((message) => (
             <div key={message.id} className="space-y-2">
               <div className="text-xs text-slate-500 flex items-center gap-2">
@@ -715,55 +837,54 @@ export default function MaritimePilotReport() {
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 flex-shrink-0">
-          <div className="flex gap-2 items-center bg-slate-50 border border-slate-200 rounded-full px-3 py-2">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={hasStarted ? "" : "Click Start to begin"}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-              disabled={!hasStarted}
-            />
-            <div className="relative" ref={setModelDropdownRef}>
-              <button
-                onClick={() => setOpenSections(prev => ({ ...prev, modelDropdown: !prev.modelDropdown }))}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 bg-white border border-indigo-200 rounded-md hover:bg-indigo-50 transition-colors"
-              >
-                {aiProvider === "gemini" ? "Gemini" : "OpenAI"}
-                <ChevronDown className="w-3 h-3" />
-              </button>
-              {openSections.modelDropdown && (
-                <div className="absolute bottom-full right-0 mb-1 bg-white border border-slate-200 rounded-md shadow-lg z-10 min-w-[100px]">
-                  <button
-                    onClick={() => {
-                      handleProviderChange("openai");
-                      setOpenSections(prev => ({ ...prev, modelDropdown: false }));
-                    }}
-                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "openai" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
-                  >
-                    GPT-4o
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleProviderChange("gemini");
-                      setOpenSections(prev => ({ ...prev, modelDropdown: false }));
-                    }}
-                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${aiProvider === "gemini" ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
-                  >
-                    Gemini 2.0 Flash
-                  </button>
+        <div className="border-t border-slate-200 flex-shrink-0 sticky bottom-0 bg-white">
+          <div className="p-4">
+            <div className="space-y-3">
+              {/* Voice Instructions - 移到右侧避免位移 */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-slate-500 px-1">
+                  {hasStarted ? "Hold down the microphone button to record your voice message." : "Click Start to begin using voice recording."}
                 </div>
-              )}
+                {/* 录音状态指示器 - 右侧显示 */}
+                {isVoiceEnabled && hasStarted && (
+                  <div className="text-xs text-slate-500 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
+                    <span>Voice enabled</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2 items-center bg-slate-50 border border-slate-200 rounded-full px-3 py-3">
+                {/* Voice Control Button */}
+                <VoiceControls
+                  isEnabled={true}
+                  aiRole={aiRole}
+                  formData={formValues}
+                  onFormUpdate={handleVoiceFormUpdate}
+                  onTranscript={handleVoiceTranscript}
+                  onVoiceReply={handleVoiceReply}
+                  onVoiceToggle={() => setIsVoiceEnabled(!isVoiceEnabled)}
+                  compactMode={true}
+                  hasStarted={hasStarted}
+                />
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder={hasStarted ? "Type your message..." : "Click Start to begin"}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                  disabled={!hasStarted}
+                />
+                <Button onClick={handleSendMessage} size="sm" className="rounded-full p-2 bg-indigo-600 hover:bg-indigo-900" disabled={!hasStarted}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <Button onClick={handleSendMessage} size="sm" className="rounded-full p-2 bg-indigo-600 hover:bg-indigo-900" disabled={!hasStarted}>
-              <Send className="w-4 h-4" />
-            </Button>
           </div>
         </div>
       </div>
 
-      <div className="w-3/5 flex flex-col m-2 ml-1">
+      <div className="w-1/2 flex flex-col m-2 ml-1">
         <div className="bg-[#1E258A] text-white p-4 rounded-t-lg flex-shrink-0">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <Ship className="w-5 h-5" />
@@ -881,65 +1002,13 @@ export default function MaritimePilotReport() {
                       onClick={() => handleFieldClick("hazards-description")}
                     />
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">Environmental Conditions:</Label>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="visibility" className="text-sm text-slate-600">
-                          Visibility
-                        </Label>
-                        <Input id="visibility" className={getFieldClassName("visibility", "mt-1")} value={formValues["visibility"] || ""} onChange={(e) => handleInputChange("visibility", e.target.value)} onClick={() => handleFieldClick("visibility")} />
-                      </div>
-                      <div>
-                        <Label htmlFor="sea-state" className="text-sm text-slate-600">
-                          Sea State
-                        </Label>
-                        <Input id="sea-state" className={getFieldClassName("sea-state", "mt-1")} value={formValues["sea-state"] || ""} onChange={(e) => handleInputChange("sea-state", e.target.value)} onClick={() => handleFieldClick("sea-state")} />
-                      </div>
-                      <div>
-                        <Label htmlFor="wind-conditions" className="text-sm text-slate-600">
-                          Wind Speed & Direction
-                        </Label>
-                        <Input id="wind-conditions" className={getFieldClassName("wind-conditions", "mt-1")} value={formValues["wind-conditions"] || ""} onChange={(e) => handleInputChange("wind-conditions", e.target.value)} onClick={() => handleFieldClick("wind-conditions")} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <Collapsible open={openSections.incidentReporting} onOpenChange={() => toggleSection("incidentReporting")}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-slate-50 rounded-lg hover:bg-slate-100">
-                <h3 className="font-medium text-slate-800">3. Incident or Near-Miss Reporting</h3>
-                {openSections.incidentReporting ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 p-4 bg-white border border-slate-200 rounded-lg">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="incident-details" className="text-sm font-medium text-slate-700">
-                      Incident or Near-Miss Details (if any occurred, otherwise write "None"):
-                    </Label>
-                    <Textarea 
-                      id="incident-details" 
-                      placeholder="Provide full details of any incident or near-miss, or write 'None'..." 
-                      className={getFieldClassName("incident-details", "mt-1")} 
-                      rows={4} 
-                      value={formValues["incident-details"] || ""} 
-                      onChange={(e) => handleInputChange("incident-details", e.target.value)} 
-                      onClick={() => handleFieldClick("incident-details")}
-                    />
-                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
 
             <Collapsible open={openSections.pilotageRecommendations} onOpenChange={() => toggleSection("pilotageRecommendations")}>
               <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-slate-50 rounded-lg hover:bg-slate-100">
-                <h3 className="font-medium text-slate-800">4. Pilotage Practices & Recommendations</h3>
+                <h3 className="font-medium text-slate-800">3. Pilotage Practices & Recommendations</h3>
                 {openSections.pilotageRecommendations ? (
                   <ChevronUp className="w-4 h-4" />
                 ) : (
@@ -966,37 +1035,47 @@ export default function MaritimePilotReport() {
 
             <Collapsible open={openSections.stressFatigue} onOpenChange={() => toggleSection("stressFatigue")}>
               <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-slate-50 rounded-lg hover:bg-slate-100">
-                <h3 className="font-medium text-slate-800">Work-Related Stress & Fatigue</h3>
+                <h3 className="font-medium text-slate-800">4. Work-Related Stress & Fatigue</h3>
                 {openSections.stressFatigue ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 bg-white border border-slate-200 rounded-lg">
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="workload" className="text-sm font-medium text-slate-700">
-                      Workload Assessment (1-5, 5 = very high)
+                      Workload Assessment (1-5, 1 = very low, 5 = very high)
                     </Label>
-                    <Input
-                      id="workload"
-                      type="text"
-                      placeholder="e.g., 3 or High workload due to heavy traffic"
-                      className={getFieldClassName("workload", "mt-1")}
-                      value={formValues["workload"] || ""}
-                      onChange={(e) => handleInputChange("workload", e.target.value)}
+                    <div
+                      className={getFieldClassName("workload", "mt-1 p-2 rounded-md") + " bg-white"}
                       onClick={() => handleFieldClick("workload")}
-                    />
+                    >
+                      <div className="flex gap-3">
+                        {[1,2,3,4,5].map((n) => (
+                          <label key={n} className="inline-flex items-center gap-1 text-sm text-slate-700">
+                            <input
+                              type="radio"
+                              name="workload"
+                              value={n}
+                              checked={String(formValues["workload"] || "") === String(n)}
+                              onChange={() => handleInputChange("workload", String(n))}
+                            />
+                            <span>{n}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <div>
-                    <Label htmlFor="stress-feedback" className="text-sm font-medium text-slate-700">
+                    <Label htmlFor="additional-comment" className="text-sm font-medium text-slate-700">
                       Additional Comments (Optional)
                     </Label>
                     <Textarea
-                      id="stress-feedback"
+                      id="additional-comment"
                       placeholder="Feel free to share any additional thoughts about stress factors or work conditions..."
-                      className={getFieldClassName("stress-feedback", "mt-1")}
+                      className={getFieldClassName("additional-comment", "mt-1")}
                       rows={3}
-                      value={formValues["stress-feedback"] || ""}
-                      onChange={(e) => handleInputChange("stress-feedback", e.target.value)}
-                      onClick={() => handleFieldClick("stress-feedback")}
+                      value={formValues["additional-comment"] || ""}
+                      onChange={(e) => handleInputChange("additional-comment", e.target.value)}
+                      onClick={() => handleFieldClick("additional-comment")}
                     />
                     <p className="text-sm text-slate-500 mt-1">Your privacy is important. Share only what you're comfortable with.</p>
                   </div>

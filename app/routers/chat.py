@@ -37,18 +37,13 @@ FIELD_INFO = {
     "pilot-id": ("1. Vessel and Pilot Details", "Pilot Name/ID"),
     # 3. Safety Observations
     "hazards-description": ("2. Safety Observations", "Potential hazards observed"),
-    "visibility": ("2. Safety Observations", "Visibility"),
-    "sea-state": ("2. Safety Observations", "Sea State"),
-    "wind-conditions": ("2. Safety Observations", "Wind Speed & Direction"),
-    # 4. Incident Reporting
-    "incident-details": ("3. Incident or Near-Miss Reporting", "Incident or Near-Miss Details"),
-    # 5. Pilotage Recommendations
-    "pilotage-comments": ("4. Pilotage Practices & Recommendations", "Comments on Pilotage Procedures"),
-    "improvements": ("4. Pilotage Practices & Recommendations", "Any Suggested Improvements"),
-    # 6. Work-Related Stress
-    "workload": ("Work-Related Stress & Fatigue", "Workload Assessment (1-5, 5 = very high)"),
-    "stress-feedback": ("Work-Related Stress & Fatigue", "Additional Comments"),
-    # 7. Submission
+    # 4. Pilotage Recommendations
+    "pilotage-comments": ("3. Pilotage Practices & Recommendations", "Comments on Pilotage Procedures"),
+    "improvements": ("3. Pilotage Practices & Recommendations", "Any Suggested Improvements"),
+    # 5. Work-Related Stress
+    "workload": ("4. Work-Related Stress & Fatigue", "Workload Assessment (1-5, 5 = very high)"),
+    "additional-comment": ("4. Work-Related Stress & Fatigue", "Additional Comments"),
+    # 6. Submission
     "submitted-by": ("Submission Details", "Submitted by"),
     "submission-date": ("Submission Details", "Date of Submission"),
 }
@@ -123,7 +118,18 @@ async def chat(req: ChatRequest):
         
         # Process AI suggestions directly (frontend already validated changes)
         for update in data["updates"]:
-            updated[update["field"]] = update["suggestion"]
+            field = update["field"]
+            value = update["suggestion"]
+            if field == "workload":
+                # Normalize to string digits '1'-'5' for frontend consistency
+                try:
+                    if isinstance(value, (int, float)):
+                        value = str(int(value))
+                    else:
+                        value = str(value).strip()
+                except Exception:
+                    value = str(value)
+            updated[field] = value
         
         has_updates = bool(updated)
         logger.info(f"[CHAT] Updated {len(updated)} fields: {list(updated.keys())}")

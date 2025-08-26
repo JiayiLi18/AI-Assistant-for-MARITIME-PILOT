@@ -20,22 +20,17 @@ The form has the following sections and fields (with current values if set):
 
 3. Safety Observations:
    - hazards-description: "Heavy vessel traffic near Granlandet Island. Captain showed signs of distraction when passing other vessels." (This is the default situation, the pilot knows more about the actual hazards description)
-   - visibility: "Foggy"
-   - sea-state: "Moderate"
-   - wind-conditions: "12 kts NW"
+   (Environmental background: visibility: foggy, sea state: moderate, wind: 12 kts NW)
 
-4. Incident Reporting:
-   - incident-details: Document any incidents or near-misses with emphasis on safety risks and close-call situations
-
-5. Pilotage Recommendations:
+4. Pilotage Recommendations:
    - pilotage-comments: Comments on pilotage procedures
    - improvements: Suggested improvements
 
-6. Work-Related Stress:
-   - workload: Assessment on a 1-5 scale indicating workload intensity
-   - stress-feedback: Feedback about stress factors - encourage open sharing while respecting privacy
+5. Work-Related Stress:
+   - workload: NUMBER ONLY (1-5). Assessment on a 1-5 scale indicating workload intensity (1 = very low, 5 = very high)
+   - additional-comment: Feedback about stress factors - encourage open sharing while respecting privacy
    
-7. Submission:
+6. Submission:
 - submitted-by: "Jake Anderson"
 - submission-date: "15-03-2026"
    """
@@ -61,20 +56,17 @@ Vessel and Pilot Details:
 
 Safety Observations:
 - hazards-description : "Potential hazards observed"
-- visibility : "Visibility"
-- sea-state : "Sea State"
-- wind-conditions : "Wind Speed & Direction"
 
 Incident or Near-Miss Reporting:
-- incident-details : "Incident or Near-Miss Details"
+  (Removed from the form)
 
 Pilotage Practices & Recommendations:
 - pilotage-comments : "Comments on Pilotage Procedures"
 - improvements : "Any Suggested Improvements"
 
 Work-Related Stress & Fatigue:
-- workload : "Workload Assessment (1-5, 5 = very high)"
-- stress-feedback : "Additional Comments"
+- workload : "Workload Assessment (1-5, 1 = very low, 5 = very high)"
+- additional-comment : "Additional Comments"
 
 Submission Details:
 - submitted-by : "Submitted by"
@@ -120,9 +112,8 @@ SPECIAL FIELD NOTES
 | Section                | Field(s)                       | Guideline                                                                   |
 |------------------------|--------------------------------|-----------------------------------------------------------------------------|
 | Safety Observations    | `hazards-description`          | Add risks immediately; then invite more detail.                             |
-| Incident Reporting     | `incident-details`             | Record incidents / near-misses as soon as mentioned.                        |
 | Pilotage Recommendations| `pilotage-comments`, `improvements` | Encourage concrete procedural suggestions.                            |
-| Work-Related Stress    | `workload`, `stress-feedback`  | Record explicit values only; respect privacy.                               |
+| Work-Related Stress    | `workload`, `additional-comment`  | Record explicit values only; respect privacy.                               |
 | Fatigue                | `fatigue-level`, `fatigue-feedback` | Record explicit values only; respect privacy.                          |"""
 
 # ================================================================
