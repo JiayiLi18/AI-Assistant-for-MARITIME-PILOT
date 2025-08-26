@@ -858,7 +858,7 @@ export class VoiceService {
       }
 
       // Create a new ArrayBuffer to avoid potential issues with shared buffers
-      const arrayBuffer = audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength);
+      const arrayBuffer = this.toSafeArrayBuffer(audioData);
       
       // Validate that we have a proper MP3 file
       const view = new Uint8Array(arrayBuffer);
@@ -870,7 +870,7 @@ export class VoiceService {
       }
 
       // Decode MP3 audio data
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer as ArrayBuffer);
 
       // Play the audio
       const source = this.audioContext.createBufferSource();
@@ -908,7 +908,8 @@ export class VoiceService {
       console.log('[VoiceService] Fallback: Using HTML5 Audio element for MP3 playback');
       
       // Create blob and object URL
-      const blob = new Blob([audioData], { type: 'audio/mpeg' });
+      const safeBuffer = this.toSafeArrayBuffer(audioData);
+      const blob = new Blob([safeBuffer], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(blob);
       
       // Create audio element
@@ -948,6 +949,13 @@ export class VoiceService {
       this.isPlaying = false;
       this.callbacks.onPlayingStateChange?.(false);
     }
+  }
+
+  // Ensure we have a true ArrayBuffer (not SharedArrayBuffer) for Web APIs expecting ArrayBuffer
+  private toSafeArrayBuffer(view: Uint8Array): ArrayBuffer {
+    const copy = new Uint8Array(view.byteLength);
+    copy.set(view);
+    return copy.buffer;
   }
 
   private stopPlayback() {
